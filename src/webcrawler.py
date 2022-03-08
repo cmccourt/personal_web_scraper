@@ -25,7 +25,7 @@ def get_all_new_links_on_page(page, level):
 					if url in strip_url:
 						url = strip_url
 					else:
-						url = "{}/{}".format(strip_url, url)
+						url = f"{strip_url}/{url}"
 				if url not in [x[0] for x in links]:
 					links.append([url, level])
 			close_tag = html.find("</a>", a_tag)

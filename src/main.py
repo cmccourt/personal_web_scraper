@@ -19,7 +19,7 @@ def save_graphs(url_graph, index_graph, page_rank):
 
 def load_graphs(graph):
     """Function that loads the graph's text file"""
-    with open("{}.txt".format(graph), "r") as file:
+    with open(f"{graph}.txt", "r") as file:
         graph = pickle.load(file)
     return graph
 
@@ -28,15 +28,15 @@ def display_graphs(url_graph=None, index_graph=None, page_rank=None):
     """Function that displays the url graph, index graph and page rankings"""
     print("\n POODLE INDEX ----- \n ")
     for url, value in index_graph.items():
-        print("{} : {}".format(url, value))
+        print(f"{url} : {value}")
     print("\n")
     print("POODLE GRAPH ----- \n ")
     for url, value in url_graph.items():
-        print("{} : {}".format(url, value))
+        print(f"{url} : {value}")
     print("\n")
     print("POODLE RANKS ----- \n ")
     for url, value in page_rank.items():
-        print("{} : {}".format(url, value))
+        print(f"{url} : {value}")
     print("\n")
 
 
@@ -101,26 +101,25 @@ def main():
                         # There has been a match with the multiple words given
                         if len(search_result["Overall"]) == 1:
                             # Only one matching URL so we only need to print it
-                            print("WOOF! {} was found!".format(user_input))
-                            print("{}".format(search_result["Overall"]))
+                            print(f"WOOF! {user_input} was found!")
+                            print(f"{search_result['Overall']}")
                         else:
                             # Need to organise the URLs based on their page ranking
                             order_urls = sorted(search_result["Overall"], key=lambda x: x[1], reverse=True)
-                            print("WOOF! {} was found!".format(user_input))
+                            print(f"WOOF! {user_input} was found!")
                             for url_rank in order_urls:
-                                print("{} : {}".format(url_rank[0], url_rank[1]))
+                                print(f"{url_rank[0]} : {url_rank[1]}")
                     else:
                         # Couldn't find a common URL for the word(s) given so display the individual words instead
-                        print(
-                            "WOOF! {} could not be found but here the individual words were found!".format(user_input))
+                        print(f"WOOF! {user_input} could not be found but here the individual words were found!")
                         url_tuple = sorted(search_result.items(), reverse=True, key=lambda x: x[1])
                         for url_rank in url_tuple:
-                            print("{}: ".format(url_rank[0]))
+                            print(f"{url_rank[0]}: ")
                             for url in url_rank[1]:
-                                print("{}".format(url))
+                                print(f"{url}")
                 else:
                     # User input couldn't be found
-                    print("WOOF! {} could not be found".format(user_input))
+                    print(f"WOOF! {user_input} could not be found")
             # The user has tried to search for words without the database.
             except UnboundLocalError:
                 print("WOOF! There is no database available. Please restore or build it")
