@@ -63,6 +63,39 @@ def display_help():
     print("-exit \t Exit the POODLE search engine")
 
 
+def search_words_with_user_input(user_input, index_graph, page_rank):
+    # User must have enter word(s) to search for
+    try:
+        search_result = searchWord.search_input(user_input, index_graph, page_rank)
+        if search_result:
+            if "Overall" in search_result:
+                # There has been a match with the multiple words given
+                if len(search_result["Overall"]) == 1:
+                    # Only one matching URL so we only need to print it
+                    print(f"WOOF! {user_input} was found!")
+                    print(f"{search_result['Overall']}")
+                else:
+                    # Need to organise the URLs based on their page ranking
+                    order_urls = sorted(search_result["Overall"], key=lambda x: x[1], reverse=True)
+                    print(f"WOOF! {user_input} was found!")
+                    for url_rank in order_urls:
+                        print(f"{url_rank[0]} : {url_rank[1]}")
+            else:
+                # Couldn't find a common URL for the word(s) given so display the individual words instead
+                print(f"WOOF! {user_input} could not be found but here the individual words were found!")
+                url_tuple = sorted(search_result.items(), reverse=True, key=lambda x: x[1])
+                for url_rank in url_tuple:
+                    print(f"{url_rank[0]}: ")
+                    for url in url_rank[1]:
+                        print(f"{url}")
+        else:
+            # User input couldn't be found
+            print(f"WOOF! {user_input} could not be found")
+    # The user has tried to search for words without the database.
+    except UnboundLocalError:
+        raise DBNotAvailable
+
+
 def main():
     """Main function that takes the user's input in the while loop
        and performs the function specified"""
@@ -76,20 +109,13 @@ def main():
             index_graph, page_rank, url_graph = build_poodle_db()
         elif user_input == '-dump':
             # If user tries to save the graphs before building or restoring them, POODLE will prompt them
-            try:
-                save_graphs(url_graph, index_graph, page_rank)
-                print("Database saved")
-            except UnboundLocalError:
-                raise DBNotAvailable
-
+            save_graphs(url_graph, index_graph, page_rank)
+            print("Database saved")
         elif user_input == '-restore':
             index_graph, page_rank, url_graph = restore_poodle_db(index_graph, page_rank, url_graph)
         elif user_input == '-print':
             # If user tries to print the graphs before building or restoring them, POODLE will prompt them
-            try:
-                display_graphs(url_graph, index_graph, page_rank)
-            except UnboundLocalError:
-                raise DBNotAvailable
+            display_graphs(url_graph, index_graph, page_rank)
         elif user_input == '-help':
             # Displays help list
             display_help()
@@ -100,36 +126,7 @@ def main():
             # The input given from user isn't valid
             print("WOOF! This is not a valid option. Use -help for list of functions")
         else:
-            # User must have enter word(s) to search for
-            try:
-                search_result = searchWord.search_input(user_input, index_graph, page_rank)
-                if search_result:
-                    if "Overall" in search_result:
-                        # There has been a match with the multiple words given
-                        if len(search_result["Overall"]) == 1:
-                            # Only one matching URL so we only need to print it
-                            print(f"WOOF! {user_input} was found!")
-                            print(f"{search_result['Overall']}")
-                        else:
-                            # Need to organise the URLs based on their page ranking
-                            order_urls = sorted(search_result["Overall"], key=lambda x: x[1], reverse=True)
-                            print(f"WOOF! {user_input} was found!")
-                            for url_rank in order_urls:
-                                print(f"{url_rank[0]} : {url_rank[1]}")
-                    else:
-                        # Couldn't find a common URL for the word(s) given so display the individual words instead
-                        print(f"WOOF! {user_input} could not be found but here the individual words were found!")
-                        url_tuple = sorted(search_result.items(), reverse=True, key=lambda x: x[1])
-                        for url_rank in url_tuple:
-                            print(f"{url_rank[0]}: ")
-                            for url in url_rank[1]:
-                                print(f"{url}")
-                else:
-                    # User input couldn't be found
-                    print(f"WOOF! {user_input} could not be found")
-            # The user has tried to search for words without the database.
-            except UnboundLocalError:
-                raise DBNotAvailable
+            search_words_with_user_input(user_input, index_graph, page_rank)
 
 
 if __name__ == "__main__":
