@@ -29,14 +29,6 @@ class PoodleDB:
             self.page_rank = _page_rank
         print("POODLE Database created")
 
-    def restore_poodle_db(self, index_graph: IndexGraph, page_rank: PageRank, url_graph: URLGraph):
-        # User can use previous POODLE database using load_graphs function
-        index_graph.data = index_graph.load_data_from_file(index_graph.default_file_path)
-        page_rank.data = page_rank.load_data_from_file(page_rank.default_file_path)
-        url_graph.data = url_graph.load_data_from_file(url_graph.default_file_path)
-        print("Session restored")
-        return index_graph, page_rank, url_graph
-
     def save_graphs(self):
         """Function that saves the url graph, index graph and
            page ranks into separate text files"""
