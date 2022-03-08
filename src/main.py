@@ -24,9 +24,9 @@ def build_poodle_db():
 
 def restore_poodle_db(index_graph, page_rank, url_graph):
     # User can use previous POODLE database using load_graphs function
-    url_graph = load_graphs("url_graph")
-    index_graph = load_graphs("index_graph")
-    page_rank = load_graphs("page_rank")
+    url_graph = load_graphs("../data/url_graph.txt")
+    index_graph = load_graphs("../data/index_graph.txt")
+    page_rank = load_graphs("../data/page_rank.txt")
     print("Session restored")
     return index_graph, page_rank, url_graph
 
@@ -43,8 +43,16 @@ def save_graphs(url_graph, index_graph, page_rank):
 
 
 def load_graphs(graph):
-    """Function that loads the graph's text file"""
-    with open(f"{graph}.txt", "r") as file:
+    """
+    Function that loads the graph's text file
+    Args:
+        graph (str): File path of graph
+
+    Returns:
+        dict: Parsed Graph
+
+    """
+    with open(graph, "r") as file:
         graph = pickle.load(file)
     return graph
 
