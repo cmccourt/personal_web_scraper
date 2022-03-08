@@ -1,9 +1,8 @@
 import pickle
 
-import pageRank
 import searchWord
-import webScraping
 import webcrawler
+from data_objects import URLGraph, IndexGraph, PageRank
 
 
 class DBNotAvailable(Exception):
@@ -11,22 +10,24 @@ class DBNotAvailable(Exception):
 
 
 def build_poodle_db():
-    url_graph = webcrawler.getUrlLinks()
+    url_graph = URLGraph(webcrawler.getUrlLinks())
+    index_graph = None
+    page_rank = None
     # If the seed URL given isn't valid then return to main menu
     if url_graph is not None:
-        index_graph = webScraping.get_index_graph(url_graph)
-        page_rank = pageRank.computeRanks(url_graph)
+        index_graph = IndexGraph(_url_graph=url_graph.data)
+        page_rank = PageRank(_url_graph=url_graph.data)
         print("POODLE Database created")
     else:
         print("URL could not be found.")
     return index_graph, page_rank, url_graph
 
 
-def restore_poodle_db(index_graph, page_rank, url_graph):
+def restore_poodle_db(index_graph: IndexGraph, page_rank: PageRank, url_graph: URLGraph):
     # User can use previous POODLE database using load_graphs function
-    url_graph = load_graphs("../data/url_graph.txt")
-    index_graph = load_graphs("../data/index_graph.txt")
-    page_rank = load_graphs("../data/page_rank.txt")
+    index_graph.data = index_graph.load_data_from_file(index_graph.default_file_path)
+    page_rank.data = page_rank.load_data_from_file(page_rank.default_file_path)
+    url_graph.data = url_graph.load_data_from_file(url_graph.default_file_path)
     print("Session restored")
     return index_graph, page_rank, url_graph
 
@@ -34,40 +35,22 @@ def restore_poodle_db(index_graph, page_rank, url_graph):
 def save_graphs(url_graph, index_graph, page_rank):
     """Function that saves the url graph, index graph and
        page ranks into separate text files"""
-    with open("../data/index_graph.txt", "w") as index_file:
-        pickle.dump(index_graph, index_file)
-    with open("../data/url_graph.txt", "w") as urls_file:
-        pickle.dump(url_graph, urls_file)
-    with open("../data/page_rank.txt", "w") as page_rank_file:
-        pickle.dump(page_rank, page_rank_file)
-
-
-def load_graphs(graph):
-    """
-    Function that loads the graph's text file
-    Args:
-        graph (str): File path of graph
-
-    Returns:
-        dict: Parsed Graph
-
-    """
-    with open(graph, "r") as file:
-        graph = pickle.load(file)
-    return graph
+    with open(index_graph.default_file_path, "w") as index_file:
+        pickle.dump(index_graph.data, index_file)
+    with open(url_graph.default_file_path, "w") as urls_file:
+        pickle.dump(url_graph.data, urls_file)
+    with open(page_rank.default_file_path, "w") as page_rank_file:
+        pickle.dump(page_rank.data, page_rank_file)
 
 
 def display_graphs(url_graph=None, index_graph=None, page_rank=None):
     """Function that displays the url graph, index graph and page rankings"""
     print("\n POODLE INDEX ----- \n ")
-    for url, value in index_graph.items():
-        print(f"{url} : {value}")
+    index_graph.display_data()
     print("\nPOODLE GRAPH ----- \n ")
-    for url, value in url_graph.items():
-        print(f"{url} : {value}")
+    url_graph.display_data()
     print("\nPOODLE RANKS ----- \n ")
-    for url, value in page_rank.items():
-        print(f"{url} : {value}")
+    page_rank.display_data()
     print("\n")
 
 
@@ -83,9 +66,9 @@ def display_help():
 def main():
     """Main function that takes the user's input in the while loop
        and performs the function specified"""
-    url_graph = None
-    index_graph = None
-    page_rank = None
+    url_graph = URLGraph()
+    index_graph = IndexGraph()
+    page_rank = PageRank()
     is_exit = False
     while not is_exit:
         user_input = input("WOOF! What would you like to do? ->")

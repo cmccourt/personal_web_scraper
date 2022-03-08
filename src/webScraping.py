@@ -51,10 +51,3 @@ def add_word_to_index(index, words, url):
             index[word] = [url]
     return index
 
-
-def get_index_graph(url_graph):
-    index = {}
-    for key, value in url_graph.items():
-        page_words = get_page_text(key)
-        add_word_to_index(index, page_words, key)
-    return index
