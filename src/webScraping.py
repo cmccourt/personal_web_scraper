@@ -9,6 +9,7 @@ def get_page_text(url):
     page_text, page_words = "", []
     html = html[html.find("<body") + 5:html.find("</body>")]
     start_script = html.find("<script")
+    ignore = []
     while start_script > -1:
         # Remove any content within a script tag
         end_script = html.find("</script>")
@@ -16,7 +17,6 @@ def get_page_text(url):
         html = html.replace(text_script, "")
         start_script = html.find("<script")
     try:
-        ignore = []
         with open("../settings/ignore_list.txt", "r") as ign_words_file:
             for word in ign_words_file:
                 # Create a list of ignore words for comparison
@@ -26,12 +26,12 @@ def get_page_text(url):
         print("Could not find the file")
     finished = False
     while not finished:
-        nextCloseTag = html.find(">")
-        nextOpenTag = html.find("<")
-        if nextOpenTag > -1:
-            content = " ".join(html[nextCloseTag + 1:nextOpenTag].strip().split())
-            page_text = page_text + " " + content
-            html = html[nextOpenTag + 1:]
+        next_close_tag = html.find(">")
+        next_open_tag = html.find("<")
+        if next_open_tag > -1:
+            content = " ".join(html[next_close_tag + 1:next_open_tag].strip().split())
+            page_text = f"{page_text} {content}"
+            html = html[next_open_tag + 1:]
         else:
             finished = True
     for word in page_text.split():
@@ -54,7 +54,6 @@ def add_word_to_index(index, words, url):
 
 def get_index_graph(url_graph):
     index = {}
-    page_words = []
     for key, value in url_graph.items():
         page_words = get_page_text(key)
         add_word_to_index(index, page_words, key)

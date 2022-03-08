@@ -50,12 +50,10 @@ def display_graphs(url_graph=None, index_graph=None, page_rank=None):
     print("\n POODLE INDEX ----- \n ")
     for url, value in index_graph.items():
         print(f"{url} : {value}")
-    print("\n")
-    print("POODLE GRAPH ----- \n ")
+    print("\nPOODLE GRAPH ----- \n ")
     for url, value in url_graph.items():
         print(f"{url} : {value}")
-    print("\n")
-    print("POODLE RANKS ----- \n ")
+    print("\nPOODLE RANKS ----- \n ")
     for url, value in page_rank.items():
         print(f"{url} : {value}")
     print("\n")
