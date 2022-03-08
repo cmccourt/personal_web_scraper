@@ -6,6 +6,10 @@ import webScraping
 import webcrawler
 
 
+class DBNotAvailable(Exception):
+    print("WOOF! There is no database available. Please restore or build it")
+
+
 def build_poodle_db():
     url_graph = webcrawler.getUrlLinks()
     # If the seed URL given isn't valid then return to main menu
@@ -30,11 +34,11 @@ def restore_poodle_db(index_graph, page_rank, url_graph):
 def save_graphs(url_graph, index_graph, page_rank):
     """Function that saves the url graph, index graph and
        page ranks into separate text files"""
-    with open("index_graph.txt", "w") as index_file:
+    with open("../data/index_graph.txt", "w") as index_file:
         pickle.dump(index_graph, index_file)
-    with open("url_graph.txt", "w") as urls_file:
+    with open("../data/url_graph.txt", "w") as urls_file:
         pickle.dump(url_graph, urls_file)
-    with open("page_rank.txt", "w") as page_rank_file:
+    with open("../data/page_rank.txt", "w") as page_rank_file:
         pickle.dump(page_rank, page_rank_file)
 
 
@@ -65,7 +69,7 @@ def display_help():
     print("-restore \t Retrieve the POODLE database")
     print("-print \t Show the POODLE database")
     print("-help \t Show this help information")
-    print("-nothing \t Exit the POODLE search engine")
+    print("-exit \t Exit the POODLE search engine")
 
 
 def main():
@@ -85,7 +89,8 @@ def main():
                 save_graphs(url_graph, index_graph, page_rank)
                 print("Database saved")
             except UnboundLocalError:
-                print("WOOF! There is no database available. Please restore or build it")
+                raise DBNotAvailable
+
         elif user_input == '-restore':
             index_graph, page_rank, url_graph = restore_poodle_db(index_graph, page_rank, url_graph)
         elif user_input == '-print':
@@ -93,11 +98,11 @@ def main():
             try:
                 display_graphs(url_graph, index_graph, page_rank)
             except UnboundLocalError:
-                print("WOOF! There is no database available. Please restore or build it")
+                raise DBNotAvailable
         elif user_input == '-help':
             # Displays help list
             display_help()
-        elif user_input == '-nothing':
+        elif user_input == '-exit':
             # Exits the application
             is_exit = True
         elif user_input[0] == '-':
@@ -133,7 +138,7 @@ def main():
                     print(f"WOOF! {user_input} could not be found")
             # The user has tried to search for words without the database.
             except UnboundLocalError:
-                print("WOOF! There is no database available. Please restore or build it")
+                raise DBNotAvailable
 
 
 if __name__ == "__main__":
