@@ -41,7 +41,7 @@ def getUrlLinks():
 	to_crawl = [[seed_url, 0]]
 	url_graph = {}
 	crawled = []
-	MAX_DEPTH = 3
+	max_depth = 3
 	while to_crawl:
 		url = to_crawl.pop()
 		level = url[1]
@@ -53,7 +53,7 @@ def getUrlLinks():
 				for link in new_links:
 					url_graph[link[0]] = []
 					to_crawl.append(link)
-		if level < MAX_DEPTH:
+		if level < max_depth:
 			crawled.append(url)
 			if url[0] not in url_graph.keys():
 				url_graph[url[0]] = []

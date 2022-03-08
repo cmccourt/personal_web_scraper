@@ -18,10 +18,9 @@ def get_page_text(url):
         start_script = html.find("<script")
     try:
         with open("../settings/ignore_list.txt", "r") as ign_words_file:
-            for word in ign_words_file:
-                # Create a list of ignore words for comparison
-                # convert word to lowercase and remove any whitespace
-                ignore.append(word.lower().strip())
+            # Create a list of ignore words for comparison
+            # convert word to lowercase and remove any whitespace
+            ignore = [word.lower().strip() for word in ign_words_file]
     except IOError:
         print("Could not find the file")
     finished = False
