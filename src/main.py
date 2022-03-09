@@ -67,9 +67,9 @@ def main():
                 except AttributeError:
                     raise DBNotAvailable
             elif user_input == '-restore':
-                index_fp = input("Enter file path for the index graph")
-                page_rank_fp = input("Enter file paths for the page rankings")
-                url_graph_fp = input("Enter file paths for the URL graph")
+                index_fp = input("Enter file path for the index graph (Optional): ")
+                page_rank_fp = input("Enter file path for the page rankings (Optional): ")
+                url_graph_fp = input("Enter file path for the URL graph (Optional): ")
                 poodle_db.restore_db_from_fp(index_fp, url_graph_fp, page_rank_fp)
             elif user_input == '-print':
                 # If user tries to print the graphs before building or restoring them, POODLE will prompt them

@@ -44,7 +44,7 @@ def get_url_links():
     url_graph_data = defaultdict(list)
     crawled = []
     # TODO make the max_depth configurable in config file
-    max_depth = 2
+    max_depth = 1
     while to_crawl:
         url = to_crawl.pop()
         level = url[1]
@@ -54,11 +54,11 @@ def get_url_links():
             new_links = get_all_new_links_on_page(url, level + 1)
             if len(new_links) > 0:
                 for link in new_links:
-                    print(f"{link[0]}\n")
                     url_graph_data[url[0]].append(link)
                     if link[0] not in [x[0] for x in crawled] and link[0] not in [x[0] for x in to_crawl]:
                         # link hasn't been crawled nor is it on the list to be crawled. Add the link to the to_crawl
                         to_crawl.append(link)
+    print("Crawling Complete!")
     if len(url_graph_data) == 1 and url_graph_data[seed_url] == []:
         # Couldn't load the URL given or there wasn't any links on the page
         return None
