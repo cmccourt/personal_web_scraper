@@ -1,5 +1,4 @@
 import searchWord
-from data_objects import URLGraph, IndexGraph, PageRank
 from src.Exceptions import DBNotAvailable
 from src.PoodleDB import PoodleDB
 
@@ -11,6 +10,15 @@ def display_help():
     print("-print \t Show the POODLE database")
     print("-help \t Show this help information")
     print("-exit \t Exit the POODLE search engine")
+
+
+def restore_poodle_db():
+    poodle_db = PoodleDB()
+    index_fp = input("Enter file path for the index graph")
+    page_rank_fp = input("Enter file paths for the page rankings")
+    url_graph_fp = input("Enter file paths for the URL graph")
+    poodle_db.restore_db_from_fp(index_fp, url_graph_fp, page_rank_fp)
+    return poodle_db
 
 
 def search_words_with_user_input(user_input, poodle_db):
@@ -50,7 +58,7 @@ def main():
     """Main function that takes the user's input in the while loop
        and performs the function specified"""
 
-    poodle_db = None
+    poodle_db = PoodleDB()
     is_exit = False
     while not is_exit:
         try:
@@ -58,10 +66,7 @@ def main():
             if user_input is None:
                 continue
             if user_input == '-build':
-                url_graph = URLGraph()
-                index_graph = IndexGraph()
-                page_rank = PageRank()
-                poodle_db = PoodleDB(url_graph, index_graph, page_rank)
+                poodle_db.build_db()
             elif user_input == '-dump':
                 # If user tries to save the graphs before building or restoring them, POODLE will prompt them
                 try:
@@ -71,10 +76,7 @@ def main():
                 except AttributeError:
                     raise DBNotAvailable
             elif user_input == '-restore':
-                index_graph = IndexGraph(input("Enter file path for the index graph"))
-                page_rank = PageRank(input("Enter file paths for the page rankings"))
-                url_graph = URLGraph(input("Enter file paths for the URL graph"))
-                poodle_db = PoodleDB(url_graph, index_graph, page_rank)
+                poodle_db = restore_poodle_db()
             elif user_input == '-print':
                 # If user tries to print the graphs before building or restoring them, POODLE will prompt them
                 try:

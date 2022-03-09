@@ -17,8 +17,12 @@ class BaseDBData:
             dict: Parsed Graph
 
         """
-        with open(file_path, "r") as file:
+        if file_path == "":
+            file_path = self.default_file_path
+        with open(file_path, "rb") as file:
             self.data = pickle.load(file)
+            if self.data is not None:
+                print("Loading Successful")
 
     def display_data(self):
         try:
@@ -27,17 +31,21 @@ class BaseDBData:
         except AttributeError:
             raise DBNotAvailable
 
-    def __init__(self, _data=None):
+    def __init__(self, _data=None, default_fp=None):
         self.data = _data
+        self.default_file_path = default_fp
 
 
 class URLGraph(BaseDBData):
 
-    def __init__(self, _data=None):
-        self.default_file_path = "../data/url_graph.txt"
-        super().__init__(_data)
+    def __init__(self, _data=None, default_fp=None):
+        if default_fp is None:
+            default_fp = "../data/url_graph.txt"
+        super().__init__(_data, default_fp)
+
+    def build_url_graph(self):
         try:
-            if _data is None:
+            if self.data is None:
                 self.data = webcrawler.get_url_links()
         except AttributeError:
             pass
@@ -45,33 +53,31 @@ class URLGraph(BaseDBData):
 
 class IndexGraph(BaseDBData):
 
-    def __init__(self, _data=None, _url_graph=None):
-        self.default_file_path = "../data/index_graph.txt"
-        if _url_graph is not None:
-            self.data = self.get_index_graph(_url_graph)
-        else:
-            super().__init__(_data)
+    def __init__(self, _data=None, _url_graph_data=None, default_fp=None):
+        if default_fp is None:
+            default_fp = "../data/index_graph.txt"
+        super().__init__(_data, default_fp)
+        if _url_graph_data is not None:
+            self.set_index_graph_data(_url_graph_data)
 
-    @staticmethod
-    def get_index_graph(url_graph):
+    def set_index_graph_data(self, url_graph):
         index = {}
         for key, value in url_graph.items():
             page_words = get_page_text(key)
             add_word_to_index(index, page_words, key)
-        return index
+        self.data = index
 
 
 class PageRank(BaseDBData):
 
-    def __init__(self, _data=None, _url_graph=None):
-        self.default_file_path = "../data/page_rank.txt"
-        if _url_graph is not None:
-            self.data = self.compute_ranks(_url_graph)
-        else:
-            super().__init__(_data)
+    def __init__(self, _data=None, _url_graph_data=None, default_fp=None):
+        if default_fp is None:
+            default_fp = "../data/page_rank.txt"
+        super().__init__(_data, default_fp)
+        if _url_graph_data is not None:
+            self.set_page_ranks_data(_url_graph_data)
 
-    @staticmethod
-    def compute_ranks(url_graph):
+    def set_page_ranks_data(self, url_graph):
         """Function that calculates the page ranking for each URL found"""
         d = 0.85
         num_loops = 10
@@ -90,4 +96,4 @@ class PageRank(BaseDBData):
                         new_rank = new_rank + d * (ranks[node] / len(url_graph[node]))
                 new_ranks[page] = new_rank
             ranks = new_ranks
-        return ranks
+        self.data = ranks
