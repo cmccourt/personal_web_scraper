@@ -1,6 +1,7 @@
 import searchWord
 from data_objects import URLGraph, IndexGraph, PageRank
-from src.PoodleDB import PoodleDB, DBNotAvailable
+from src.Exceptions import DBNotAvailable
+from src.PoodleDB import PoodleDB
 
 
 def display_help():
@@ -48,46 +49,52 @@ def search_words_with_user_input(user_input, poodle_db):
 def main():
     """Main function that takes the user's input in the while loop
        and performs the function specified"""
-    url_graph = URLGraph()
-    index_graph = IndexGraph()
-    page_rank = PageRank()
+
     poodle_db = None
     is_exit = False
     while not is_exit:
-        user_input = input("WOOF! What would you like to do? ->")
-        if user_input == '-build':
-            poodle_db = PoodleDB(url_graph, index_graph, page_rank)
-        elif user_input == '-dump':
-            # If user tries to save the graphs before building or restoring them, POODLE will prompt them
-            try:
-                poodle_db.save_graphs()
-                print("Database saved")
-            # The user has tried to search for words without the database.
-            except AttributeError:
-                raise DBNotAvailable
-        elif user_input == '-restore':
-            index_graph = IndexGraph(input("Enter file path for the index graph"))
-            page_rank = PageRank(input("Enter file paths for the page rankings"))
-            url_graph = URLGraph(input("Enter file paths for the URL graph"))
-            poodle_db = PoodleDB(url_graph, index_graph, page_rank)
-        elif user_input == '-print':
-            # If user tries to print the graphs before building or restoring them, POODLE will prompt them
-            try:
-                poodle_db.display_graphs()
+        try:
+            user_input = input("WOOF! What would you like to do? ->")
+            if user_input is None:
+                continue
+            if user_input == '-build':
+                url_graph = URLGraph()
+                index_graph = IndexGraph()
+                page_rank = PageRank()
+                poodle_db = PoodleDB(url_graph, index_graph, page_rank)
+            elif user_input == '-dump':
+                # If user tries to save the graphs before building or restoring them, POODLE will prompt them
+                try:
+                    poodle_db.save_graphs()
+                    print("Database saved")
                 # The user has tried to search for words without the database.
-            except AttributeError:
-                raise DBNotAvailable
-        elif user_input == '-help':
-            # Displays help list
-            display_help()
-        elif user_input == '-exit':
-            # Exits the application
-            is_exit = True
-        elif user_input[0] == '-':
-            # The input given from user isn't valid
-            print("WOOF! This is not a valid option. Use -help for list of functions")
-        else:
-            search_words_with_user_input(user_input, poodle_db)
+                except AttributeError:
+                    raise DBNotAvailable
+            elif user_input == '-restore':
+                index_graph = IndexGraph(input("Enter file path for the index graph"))
+                page_rank = PageRank(input("Enter file paths for the page rankings"))
+                url_graph = URLGraph(input("Enter file paths for the URL graph"))
+                poodle_db = PoodleDB(url_graph, index_graph, page_rank)
+            elif user_input == '-print':
+                # If user tries to print the graphs before building or restoring them, POODLE will prompt them
+                try:
+                    poodle_db.display_graphs()
+                    # The user has tried to search for words without the database.
+                except AttributeError:
+                    raise DBNotAvailable
+            elif user_input == '-help':
+                # Displays help list
+                display_help()
+            elif user_input == '-exit':
+                # Exits the application
+                is_exit = True
+            elif user_input[0] == '-':
+                # The input given from user isn't valid
+                print("WOOF! This is not a valid option. Use -help for list of functions")
+            else:
+                search_words_with_user_input(user_input, poodle_db)
+        except DBNotAvailable:
+            print("WOOF! There is no database available. Please restore or build it")
 
 
 if __name__ == "__main__":

@@ -4,17 +4,13 @@ from src import webcrawler
 from src.data_objects import URLGraph, PageRank, IndexGraph
 
 
-class DBNotAvailable(Exception):
-    print("WOOF! There is no database available. Please restore or build it")
-
-
 class PoodleDB:
 
     def __init__(self, _url_graph: URLGraph, _index_graph: IndexGraph, _page_rank: PageRank):
 
         # If the seed URL given isn't valid then return to main menu
         if _url_graph is None:
-            self.url_graph = URLGraph(webcrawler.getUrlLinks())
+            self.url_graph = URLGraph(webcrawler.get_url_links())
             if self.url_graph.data is None:
                 print("URL could not be found.")
         else:
