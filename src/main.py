@@ -12,15 +12,6 @@ def display_help():
     print("-exit \t Exit the POODLE search engine")
 
 
-def restore_poodle_db():
-    poodle_db = PoodleDB()
-    index_fp = input("Enter file path for the index graph")
-    page_rank_fp = input("Enter file paths for the page rankings")
-    url_graph_fp = input("Enter file paths for the URL graph")
-    poodle_db.restore_db_from_fp(index_fp, url_graph_fp, page_rank_fp)
-    return poodle_db
-
-
 def search_words_with_user_input(user_input, poodle_db):
     # User must have enter word(s) to search for
     try:
@@ -76,7 +67,10 @@ def main():
                 except AttributeError:
                     raise DBNotAvailable
             elif user_input == '-restore':
-                poodle_db = restore_poodle_db()
+                index_fp = input("Enter file path for the index graph")
+                page_rank_fp = input("Enter file paths for the page rankings")
+                url_graph_fp = input("Enter file paths for the URL graph")
+                poodle_db.restore_db_from_fp(index_fp, url_graph_fp, page_rank_fp)
             elif user_input == '-print':
                 # If user tries to print the graphs before building or restoring them, POODLE will prompt them
                 try:
