@@ -12,39 +12,6 @@ def display_help():
     print("-exit \t Exit the POODLE search engine")
 
 
-def search_words_with_user_input(user_input, poodle_db):
-    # User must have enter word(s) to search for
-    try:
-        search_result = searchWord.search_input(user_input, poodle_db.index_graph, poodle_db.page_rank)
-        if search_result:
-            if "Overall" in search_result:
-                # There has been a match with the multiple words given
-                if len(search_result["Overall"]) == 1:
-                    # Only one matching URL so we only need to print it
-                    print(f"WOOF! {user_input} was found!")
-                    print(f"{search_result['Overall']}")
-                else:
-                    # Need to organise the URLs based on their page ranking
-                    order_urls = sorted(search_result["Overall"], key=lambda x: x[1], reverse=True)
-                    print(f"WOOF! {user_input} was found!")
-                    for url_rank in order_urls:
-                        print(f"{url_rank[0]} : {url_rank[1]}")
-            else:
-                # Couldn't find a common URL for the word(s) given so display the individual words instead
-                print(f"WOOF! {user_input} could not be found but here the individual words were found!")
-                url_tuple = sorted(search_result.items(), reverse=True, key=lambda x: x[1])
-                for url_rank in url_tuple:
-                    print(f"{url_rank[0]}: ")
-                    for url in url_rank[1]:
-                        print(f"{url}")
-        else:
-            # User input couldn't be found
-            print(f"WOOF! {user_input} could not be found")
-    # The user has tried to search for words without the database.
-    except AttributeError:
-        raise DBNotAvailable
-
-
 def main():
     """Main function that takes the user's input in the while loop
        and performs the function specified"""
@@ -84,11 +51,14 @@ def main():
             elif user_input == '-exit':
                 # Exits the application
                 is_exit = True
-            elif user_input[0] == '-':
-                # The input given from user isn't valid
-                print("WOOF! This is not a valid option. Use -help for list of functions")
+            # elif user_input[0] == '-':
+            #     # The input given from user isn't valid
+            #     print("WOOF! This is not a valid option. Use -help for list of functions")
+            elif user_input == "-search":
+                user_input = input("Please enter your search: ")
+                searchWord.search_words_with_user_input(user_input, poodle_db)
             else:
-                search_words_with_user_input(user_input, poodle_db)
+                print("WOOF! This is not a valid option. Use -help for list of functions")
         except DBNotAvailable:
             print("WOOF! There is no database available. Please restore or build it")
 
