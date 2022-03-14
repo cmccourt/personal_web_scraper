@@ -1,8 +1,9 @@
 import pickle
+from collections import defaultdict
 
 from src import webcrawler
 from src.Exceptions import DBNotAvailable
-from src.webScraping import get_page_text, add_word_to_index
+from src.webScraping import get_page_text
 
 
 class BaseDBData:
@@ -60,11 +61,12 @@ class IndexGraph(BaseDBData):
             self.set_index_graph_data(_url_graph_data)
 
     def set_index_graph_data(self, url_graph):
-        index = {}
-        for key, value in url_graph.items():
-            page_words = get_page_text(key)
-            add_word_to_index(index, page_words, key)
-        self.data = index
+        index_data = defaultdict(list)
+        for url, value in url_graph.items():
+            page_words = get_page_text(url)
+            for word in page_words:
+                index_data[word].append(url)
+        self.data = index_data
 
 
 class PageRank(BaseDBData):
