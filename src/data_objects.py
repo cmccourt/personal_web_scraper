@@ -46,7 +46,8 @@ class URLGraph(BaseDBData):
 
     def build_url_graph(self):
         try:
-            self.data = webcrawler.get_url_links()
+            seed_url = input("Please enter the URL: ")
+            self.data = webcrawler.get_url_links(seed_url)
         except AttributeError:
             pass
 
