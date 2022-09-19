@@ -84,5 +84,4 @@ def get_url_links(seed_url):
     if len(url_graph_data) == 1 and url_graph_data[seed_url] == []:
         # Couldn't load the URL given or there wasn't any links on the page
         return None
-    else:
-        return url_graph_data
+    return url_graph_data
