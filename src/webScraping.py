@@ -1,5 +1,6 @@
 import re
-
+import pandas as pd
+import bs4
 import requests
 from bs4 import BeautifulSoup
 
@@ -14,6 +15,12 @@ def get_ignore_words():
     except IOError:
         print("Could not find the file")
     return ignore_words
+
+
+def get_page_table(url: str):
+    page_html_tables = pd.read_html(url)
+    team_stats = pd.concat(page_html_tables, ignore_index=False)
+    return team_stats
 
 
 def get_page_text(url: str, ignore_words: list = None) -> str:
