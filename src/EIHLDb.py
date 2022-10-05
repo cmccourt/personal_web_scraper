@@ -3,7 +3,7 @@ import pickle
 from src.data_objects import URLGraph, PageRank, IndexGraph
 
 
-class PoodleDB:
+class EIHLDb:
 
     def __init__(self, _url_graph: URLGraph = None, _index_graph: IndexGraph = None, _page_rank: PageRank = None):
         self.url_graph = URLGraph()

@@ -6,20 +6,20 @@ from src.Exceptions import DBNotAvailable
 TOTAL_KEY = "--total"
 
 
-def search_words_with_user_input(user_input, poodle_db):
+def search_words_with_user_input(user_input, db):
     # User must have entered word(s) to search for
     try:
-        search_result = search_input(user_input, poodle_db.index_graph.data, poodle_db.page_rank.data)
+        search_result = search_input(user_input, db.index_graph.data, db.page_rank.data)
         if TOTAL_KEY in search_result:
             # There has been a match with the multiple words given
             # Need to organise the URLs based on their page ranking
             order_urls = sorted(search_result[TOTAL_KEY], key=lambda x: x[1], reverse=True)
-            print(f"WOOF! {user_input} was found!")
+            print(f"ERROR! {user_input} was found!")
             for url_rank in order_urls:
                 print(f"{url_rank[0]} : {url_rank[1]}")
         elif len(search_result) > 0:
             # Couldn't find a common URL for the word(s) given so display the individual words instead
-            print(f"WOOF! {user_input} could not be found but here the individual words were found!")
+            print(f"ERROR! {user_input} could not be found but here the individual words were found!")
             url_tuple = sorted(search_result.items(), reverse=True, key=lambda x: x[1])
             for url_rank in url_tuple:
                 print(f"{url_rank[0]}: {[f'{url}, ' for url in url_rank[1]]} \n")
@@ -28,7 +28,7 @@ def search_words_with_user_input(user_input, poodle_db):
                 # print("\n")
         else:
             # User input couldn't be found
-            print(f"WOOF! {user_input} could not be found")
+            print(f"ERROR! {user_input} could not be found")
     # The user has tried to search for words without the database.
     except AttributeError:
         raise DBNotAvailable
