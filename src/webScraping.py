@@ -17,10 +17,12 @@ def get_ignore_words():
     return ignore_words
 
 
-def get_page_table(url: str):
+def get_page_stats(url: str):
     page_html_tables = pd.read_html(url)
-    team_stats = pd.concat(page_html_tables, ignore_index=False)
-    return team_stats
+    if len(page_html_tables) > 0:
+        return pd.concat(page_html_tables, ignore_index=False)
+    else:
+        return page_html_tables
 
 
 def get_page_text(url: str, ignore_words: list = None) -> str:
