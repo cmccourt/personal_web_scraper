@@ -1,7 +1,7 @@
 CREATE TABLE "public.team" (
-	"team_id" serial(255) NOT NULL,
+	"team_id" serial NOT NULL,
 	"name" varchar(255) NOT NULL,
-	"date_formed" DATE(255),
+	"date_formed" DATE,
 	"arena_id" int,
 	CONSTRAINT "team_pk" PRIMARY KEY ("team_id")
 ) WITH (
@@ -52,8 +52,8 @@ CREATE TABLE "public.match" (
 	"away_team_id" int NOT NULL,
 	"location_id" int,
 	"match_date" DATE NOT NULL,
-	"home_score" int(2),
-	"away_score" int(2),
+	"home_score" int,
+	"away_score" int,
 	CONSTRAINT "match_pk" PRIMARY KEY ("match_id")
 ) WITH (
   OIDS=FALSE
@@ -110,17 +110,17 @@ CREATE TABLE "public.match_player_stats" (
 	"match_id" int NOT NULL,
 	"team_id" int NOT NULL,
 	"player_id" int NOT NULL,
-	"goals" int(2),
-	"assists" int(2),
-	"points" int(2),
-	"penalty_mins" int(2),
-	"power_play_goals" int(2),
-	"short_hand_goals" int(2),
-	"+/-" int(2),
-	"shots" int(3),
-	"shots_on_goal" int(3),
-	"face_offs_won" int(3),
-	"face_offs_lost" int(3)
+	"goals" int,
+	"assists" int,
+	"points" int,
+	"penalty_mins" int,
+	"power_play_goals" int,
+	"short_hand_goals" int,
+	"+/-" int,
+	"shots" int,
+	"shots_on_goal" int,
+	"face_offs_won" int,
+	"face_offs_lost" int
 ) WITH (
   OIDS=FALSE
 );
@@ -130,16 +130,16 @@ CREATE TABLE "public.match_player_stats" (
 CREATE TABLE "public.match_team_stats" (
 	"match_id" bigint NOT NULL,
 	"team_id" bigint NOT NULL,
-	"shots" int(3),
-	"shots_on_goal" int(3),
+	"shots" int,
+	"shots_on_goal" int,
 	"shot_efficiency" DECIMAL(3),
-	"power_plays" int(3),
-	"power_play_efficiency" double(3),
-	"penalty_minutes" int(3),
+	"power_plays" int,
+	"power_play_efficiency" DECIMAL(3),
+	"penalty_minutes" int,
 	"penalty_kill_efficiency" DECIMAL(3),
-	"saves" int(3),
+	"saves" int,
 	"save_percentage" DECIMAL(3),
-	"faceoffs_won" int(3)
+	"faceoffs_won" int
 ) WITH (
   OIDS=FALSE
 );
