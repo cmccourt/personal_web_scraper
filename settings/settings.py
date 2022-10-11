@@ -1,6 +1,17 @@
+from dataclasses import dataclass
 
 
+@dataclass
+class EIHLStatsDBConfig:
+    hostname = "localhost"
+    un = "eihlstats"
+    pw = "20?6Lo5weLL"
+    db = "eihlstats"
+
+
+# TODO create team URLs here
 eihl_base_url = "https://www.eliteleague.co.uk/"
+eihl_team_url = f"{eihl_base_url}team/"
 
 eihl_teams = [
     "Belfast Giants",
