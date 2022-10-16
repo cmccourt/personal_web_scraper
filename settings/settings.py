@@ -12,6 +12,7 @@ class EIHLStatsDBConfig:
 # TODO create team URLs here
 eihl_base_url = "https://www.eliteleague.co.uk/"
 eihl_team_url = f"{eihl_base_url}team/"
+eihl_match_url = f"{eihl_base_url}/schedule"
 
 eihl_teams = [
     "Belfast Giants",
