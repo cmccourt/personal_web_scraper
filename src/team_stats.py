@@ -7,6 +7,7 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 from settings.settings import eihl_team_url, eihl_match_url
+from src.eihl_stats_db import db_connection, insert_match, db_cursor
 from webScraping import get_page_stats
 
 """@dataclass
@@ -74,7 +75,7 @@ def get_matches(url: str, filt: Callable[[str], bool]):
             match_details = [r.text.strip() for r in tag.contents]
 
             match_details = [x for x in match_details if x.lower() not in ("", "details")]
-            match_info["match_datetime"] = datetime.combine(match_date,
+            match_info["match_date"] = datetime.combine(match_date,
                                                             get_date_format(match_details[0], "%H:%M").time())
             match_details[1] = match_details[1].replace("\n", "").strip()
             match_details[1] = re.sub('  +', '\t', match_details[1])
@@ -93,17 +94,27 @@ def get_matches(url: str, filt: Callable[[str], bool]):
                     away_score = score[1]
                     match_type = "R"
                 match_info["away_score"] = int(away_score)
-                match_info["match_type"] = match_type
+                match_info["match_win_type"] = match_type
             else:
                 match_info["home_score"] = None
                 match_info["away_score"] = None
-                match_info["match_type"] = None
-
-            print(match_info)
+                match_info["match_win_type"] = None
             matches.append(match_info)
+    return matches
 
 
-
-    print("COMPLETE")
-
-get_matches("https://www.eliteleague.co.uk/schedule?id_season=36&id_team=0&id_month=999", lambda x: True)
+eihl_matches = get_matches("https://www.eliteleague.co.uk/schedule?id_season=36&id_team=0&id_month=999", lambda x: True)
+db_conn = None
+db_cur = None
+try:
+    db_conn = db_connection()
+    db_cur = db_cursor(db_conn)
+    for match in eihl_matches:
+        insert_match(match, db_cur, db_conn)
+except Exception as e:
+    print(f"ERROR! {e}")
+finally:
+    if db_conn is not None:
+        if db_cur is not None:
+            db_cur.close()
+        db_conn.close()
