@@ -7,8 +7,8 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 from settings.settings import eihl_team_url, eihl_match_url
-from src.eihl_stats_db import db_connection, insert_match, db_cursor
-from webScraping import get_page_stats
+from src.eihl_stats_db import db_connection, insert_match, db_cursor, insert_championship
+from webScraping import get_page_stats, get_html_content, get_matches, get_eihl_championship_options
 
 """@dataclass
 class Player:
@@ -26,25 +26,13 @@ class Team:
 """
 
 
-def get_date_format(text: str, format: str) -> datetime or None:
-    try:
-        text_dt = datetime.strptime(text, format)
-        return text_dt
-    except ValueError:
-        return None
-
-
 def get_team_stats(team_name: str):
     # "https://www.eliteleague.co.uk/team/4-belfast-giants/player-stats?id_season=37"
 
     team_url = f"{eihl_team_url}4-belfast-giants/player-stats?id_season=37"
     response = requests.get(team_url)
     res_beaus = BeautifulSoup(response.content, 'html.parser')
-    res_beaus_id_season = res_beaus.body.find(id="id_season")
-    season_options = {i: x.get_text() for i, x in enumerate(res_beaus_id_season.find_all("option"))}
 
-    # for s_id in res_beaus_id_season.find_all("option"):
-    #     print(s_id)
     team_stats = get_page_stats(team_url)
     return team_stats
 
@@ -53,64 +41,16 @@ def get_players_stats(player_name: str, team_stats: pd.DataFrame = None):
     pass
 
 
-def get_matches(url: str, filt: Callable[[str], bool]):
-    if filt is None:
-        filt = lambda x: True
-    response = requests.get(url)
-    res_beaus = BeautifulSoup(response.content, 'html.parser')
-    html_content = res_beaus.find("body").find("main").find(class_="wrapper")
-    html_content = html_content.find(class_="container-fluid text-center text-md-left")
-
-    matches = []
-    match_date = None
-    for tag in html_content:
-
-        game_date_text = tag.get_text()
-        game_date = get_date_format(game_date_text, "%A %d.%m.%Y")
-        if game_date is not None and match_date != game_date_text:
-            match_date = game_date
-
-        if tag.name == "div" and len(tag.find_all()) > 0:
-            match_info = defaultdict()
-            match_details = [r.text.strip() for r in tag.contents]
-
-            match_details = [x for x in match_details if x.lower() not in ("", "details")]
-            match_info["match_date"] = datetime.combine(match_date,
-                                                            get_date_format(match_details[0], "%H:%M").time())
-            match_details[1] = match_details[1].replace("\n", "").strip()
-            match_details[1] = re.sub('  +', '\t', match_details[1])
-            match_details[1] = (match_details[1].split("\t"))
-            match_info["home_team"] = match_details[1][0]
-            match_info["away_team"] = match_details[1][-1]
-
-            # if match went to OT or SO then we need to separate that
-            score = match_details[1][1].split(":")
-            if score[0] != "-":
-                match_info["home_score"] = int(score[0])
-                # OT or SO could be in string
-                try:
-                    away_score, match_type = score[1].split(" ")
-                except ValueError:
-                    away_score = score[1]
-                    match_type = "R"
-                match_info["away_score"] = int(away_score)
-                match_info["match_win_type"] = match_type
-            else:
-                match_info["home_score"] = None
-                match_info["away_score"] = None
-                match_info["match_win_type"] = None
-            matches.append(match_info)
-    return matches
-
-
-eihl_matches = get_matches("https://www.eliteleague.co.uk/schedule?id_season=36&id_team=0&id_month=999", lambda x: True)
+# eihl_matches = get_matches("https://www.eliteleague.co.uk/schedule?id_season=36&id_team=0&id_month=999", lambda x: True)
 db_conn = None
 db_cur = None
 try:
     db_conn = db_connection()
     db_cur = db_cursor(db_conn)
-    for match in eihl_matches:
-        insert_match(match, db_cur, db_conn)
+    champion_options = get_eihl_championship_options()
+    print("COMPLETE")
+    for match in champion_options:
+        insert_championship(match, db_cur, db_conn)
 except Exception as e:
     print(f"ERROR! {e}")
 finally:
