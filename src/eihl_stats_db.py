@@ -1,3 +1,4 @@
+import traceback
 from datetime import datetime
 
 import psycopg2
@@ -58,36 +59,29 @@ def insert_championship(champ: dict, cursor: _psycopg.cursor, db_conn: _psycopg.
     else:
         db_conn.commit()
 
-    print("MATCH has been inserted!")
+    print("Championship has been inserted!")
 
 
 def insert_match(match: dict, cursor: _psycopg.cursor, db_conn: _psycopg.connection = None):
-    cursor.execute("SELECT * FROM match", db_conn)
-    col_headers = [desc[0] for desc in cursor.description]
-    # columns to exclude from comparison
-    exclude_cols = ["match_id", "championship_id", "location_id"]
-    matches_dtf = pd.DataFrame(data=cursor.fetchall(),
-                               columns=col_headers)
+    where_clause = sql.SQL(" AND ").join(sql.Composed([sql.Composed([sql.Identifier(k),
+                                                                     sql.SQL("="), sql.Placeholder(k)]) for k, v in
+                                                       match.items()]))
+    dup_match_sql = sql.SQL("SELECT * FROM match WHERE {}".format(
+        where_clause.as_string(db_conn)
+    ))
+    print(cursor.mogrify(dup_match_sql, match))
+    cursor.execute(dup_match_sql, match)
+    dup_matches = cursor.fetchall()
 
-    matches_dtf = matches_dtf.drop(exclude_cols, axis=1)
-
-    match_series = pd.DataFrame([match], columns=col_headers)
-    match_series = match_series.drop(exclude_cols, axis=1)
-    match_series[["home_score", "away_score"]] = match_series[["home_score", "away_score"]].fillna(np.nan)
-
-    matches_dtf["match_win_type"] = matches_dtf["match_win_type"].str.strip()
-    match_series["match_win_type"] = match_series["match_win_type"].str.strip()
-    # check datatypes for each column
-    matches_dtf = matches_dtf.astype(match_series.dtypes.to_dict())
     try:
-        merged_dtfs = pd.merge(matches_dtf, match_series, how='inner')
-        if merged_dtfs.empty:
+        if len(dup_matches) == 0:
             insert_sql = sql.SQL("INSERT INTO match ({}) VALUES ({})").format(
                 sql.SQL(", ").join(map(sql.Identifier, match)),
                 sql.SQL(", ").join(map(sql.Placeholder, match))
             )
             cursor.execute(insert_sql, match)
     except Exception as e:
+        traceback.print_exc()
         print(e)
     else:
         db_conn.commit()

@@ -8,8 +8,10 @@ import pandas as pd
 import bs4
 import requests
 from bs4 import BeautifulSoup
+from psycopg2 import _psycopg
 
 from settings.settings import eihl_match_url
+from src.eihl_stats_db import db_connection, db_cursor, insert_match
 
 
 def get_eihl_championship_options():
@@ -44,9 +46,32 @@ def get_html_content(url: str) -> BeautifulSoup:
     return res_beaus
 
 
-def get_matches(url: str, filt: Callable[[str], bool]):
-    if filt is None:
-        filt = lambda x: True
+def populate_all_eihl_matches(db_cur: _psycopg.cursor = None, db_conn: _psycopg.connection = None):
+    month_id = 999
+    team_id = 0
+    matches = []
+    if db_cur is None:
+        if db_conn is None:
+            db_conn = db_connection()
+        db_cur = db_cursor(db_conn)
+    try:
+        # get all EIHL season ids to iterate through
+        db_cur.execute("SELECT champion_id, eihl_web_id FROM championship WHERE eihl_web_id <> 36")
+        seasons = db_cur.fetchall()
+        for season in seasons:
+            season_url = f"{eihl_match_url}?id_season={season[1]}&id_team={team_id}&id_month={month_id}"
+            season_matches = get_matches(season_url)
+            for match in season_matches:
+                match.update({"championship_id": season[1]})
+                insert_match(match, db_cur, db_conn)
+
+    except Exception as e:
+        traceback.print_exc()
+        print(f"{e}")
+        raise e
+
+
+def get_matches(url: str, filt: Callable[[str], bool] = lambda x: True):
     res_beaus = get_html_content(url)
 
     html_content = res_beaus.find("body").find("main").find(class_="wrapper")
@@ -66,8 +91,19 @@ def get_matches(url: str, filt: Callable[[str], bool]):
             match_details = [r.text.strip() for r in tag.contents]
 
             match_details = [x for x in match_details if x.lower() not in ("", "details")]
-            match_info["match_date"] = datetime.combine(match_date,
-                                                        get_date_format(match_details[0], "%H:%M").time())
+            try:
+                match_info["match_date"] = datetime.combine(match_date,
+                                                            get_date_format(match_details[0], "%H:%M").time())
+            except AttributeError:
+                # There was no time present. Created dummy placeholder
+                match_info["match_date"] = match_date
+                match_details.insert(0, None)
+
+            test = not str.isdigit(match_details[1]) and len(match_details) > 2
+            # EIHL website for older seasons have game numbers or match type between time and home team
+            if str.isdigit(match_details[1]) or len(match_details) > 2:
+                del match_details[1]
+
             match_details[1] = match_details[1].replace("\n", "").strip()
             match_details[1] = re.sub('  +', '\t', match_details[1])
             match_details[1] = (match_details[1].split("\t"))
@@ -75,22 +111,28 @@ def get_matches(url: str, filt: Callable[[str], bool]):
             match_info["away_team"] = match_details[1][-1]
 
             # if match went to OT or SO then we need to separate that
-            score = match_details[1][1].split(":")
-            if score[0] != "-":
-                match_info["home_score"] = int(score[0])
-                # OT or SO could be in string
-                try:
-                    away_score, match_type = score[1].split(" ")
-                except ValueError:
-                    away_score = score[1]
-                    match_type = "R"
-                match_info["away_score"] = int(away_score)
-                match_info["match_win_type"] = match_type
+            try:
+                score = match_details[1][1].split(":")
+            except IndexError:
+                print(type(match_details[1]))
+                traceback.print_exc()
+                print(match_details)
             else:
-                match_info["home_score"] = None
-                match_info["away_score"] = None
-                match_info["match_win_type"] = None
-            matches.append(match_info)
+                if score[0] != "-":
+                    match_info["home_score"] = int(score[0])
+                    # OT or SO could be in string
+                    try:
+                        away_score, match_type = score[1].split(" ")
+                    except ValueError:
+                        away_score = score[1]
+                        match_type = "R"
+                    match_info["away_score"] = int(away_score)
+                    match_info["match_win_type"] = match_type
+                else:
+                    match_info["home_score"] = None
+                    match_info["away_score"] = None
+                    match_info["match_win_type"] = None
+                matches.append(match_info)
     return matches
 
 
