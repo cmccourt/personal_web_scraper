@@ -31,24 +31,17 @@ def db_cursor(db_conn: _psycopg.connection) -> _psycopg.cursor:
 
 
 def insert_championship(champ: dict, cursor: _psycopg.cursor, db_conn: _psycopg.connection = None):
-    cursor.execute("SELECT * FROM championship", db_conn)
-    col_headers = [desc[0] for desc in cursor.description]
-    # columns to exclude from comparison
-    exclude_cols = ["champion_id", "start_date", "end_date"]
-
-    champ_dtf = pd.DataFrame(data=cursor.fetchall(),
-                             columns=col_headers)
-    champ_dtf = champ_dtf.drop(exclude_cols, axis=1)
-
-    champ_series = pd.DataFrame([champ], columns=col_headers)
-    champ_series = champ_series.drop(exclude_cols, axis=1)
-    champ_dtf["name"] = champ_dtf["name"].str.strip()
-    champ_series["name"] = champ_series["name"].str.strip()
-    # check datatypes for each column
-    champ_dtf = champ_dtf.astype(champ_series.dtypes.to_dict())
+    where_clause = sql.SQL(" AND ").join(sql.Composed([sql.Composed([sql.Identifier(k),
+                                                                     sql.SQL("="), sql.Placeholder(k)]) for k, v in
+                                                       champ.items()]))
+    dup_match_sql = sql.SQL("SELECT * FROM championship WHERE {}".format(
+        where_clause.as_string(db_conn)
+    ))
+    print(cursor.mogrify(dup_match_sql, champ))
+    cursor.execute(dup_match_sql, champ)
+    dup_matches = cursor.fetchall()
     try:
-        merged_dtfs = pd.merge(champ_dtf, champ_series, how='inner')
-        if merged_dtfs.empty:
+        if len(dup_matches) == 0:
             insert_sql = sql.SQL("INSERT INTO championship ({}) VALUES ({})").format(
                 sql.SQL(", ").join(map(sql.Identifier, champ)),
                 sql.SQL(", ").join(map(sql.Placeholder, champ))
@@ -58,7 +51,6 @@ def insert_championship(champ: dict, cursor: _psycopg.cursor, db_conn: _psycopg.
         print(e)
     else:
         db_conn.commit()
-
     print("Championship has been inserted!")
 
 
