@@ -1,11 +1,8 @@
 import traceback
-from datetime import datetime
 
 import psycopg2
-import pandas as pd
-import numpy as np
 from psycopg2 import _psycopg, sql, extras
-import pandas.io.sql as sqlio
+
 from settings.settings import EIHLStatsDBConfig
 
 
@@ -54,28 +51,59 @@ def insert_championship(champ: dict, cursor: _psycopg.cursor, db_conn: _psycopg.
     print("Championship has been inserted!")
 
 
-def insert_match(match: dict, cursor: _psycopg.cursor, db_conn: _psycopg.connection = None):
+def insert_match(match: dict, cursor: _psycopg.cursor, db_conn: _psycopg.connection = None,
+                 update_exist_data: bool = False):
     where_clause = sql.SQL(" AND ").join(sql.Composed([sql.Composed([sql.Identifier(k),
                                                                      sql.SQL("="), sql.Placeholder(k)]) for k, v in
                                                        match.items()]))
     dup_match_sql = sql.SQL("SELECT * FROM match WHERE {}".format(
         where_clause.as_string(db_conn)
     ))
-    print(cursor.mogrify(dup_match_sql, match))
     cursor.execute(dup_match_sql, match)
     dup_matches = cursor.fetchall()
-
+    query = None
     try:
         if len(dup_matches) == 0:
-            insert_sql = sql.SQL("INSERT INTO match ({}) VALUES ({})").format(
+            # Find duplicates using datetime home team and away team only
+            where_clause = sql.SQL(" AND ").join(sql.Composed([sql.Composed([sql.Identifier(k),
+                                                                             sql.SQL("="), sql.Placeholder(k)]) for k, v
+                                                               in
+                                                               match.items()]))
+            dup_match_sql = sql.SQL("""SELECT * FROM match WHERE "match_date" = %(match_date)s AND
+             "home_team" = %(home_team)s AND "away_team" = %(away_team)s """
+                                    )
+            # print(cursor.mogrify(dup_match_sql, match))
+            cursor.execute(dup_match_sql, {"match_date": match.get("match_date", None),
+                                           "home_team": match.get("home_team", None),
+                                           "away_team": match.get("away_team", None)})
+            dup_matches = cursor.fetchall()
+
+        if len(dup_matches) == 0:
+            query = sql.SQL("INSERT INTO match ({}) VALUES ({})").format(
                 sql.SQL(", ").join(map(sql.Identifier, match)),
                 sql.SQL(", ").join(map(sql.Placeholder, match))
             )
-            cursor.execute(insert_sql, match)
-    except Exception as e:
+            print("MATCH to be inserted!")
+        elif len(dup_matches) == 1 and update_exist_data:
+            update_cols = sql.SQL(", ").join(sql.Composed(
+                [sql.Composed([sql.Identifier(k),
+                               sql.SQL("="),
+                               sql.Placeholder(k)]) for k, v in match.items()]))
+            query = sql.SQL("UPDATE match SET {} WHERE {}").format(update_cols, where_clause)
+            print("Match already exists")
+        elif len(dup_matches) > 1:
+            print(f"THERE ARE MULTIPLE MATCHES")
+        else:
+            print("Match already exists in DB. Not updating it!")
+        if query is not None:
+            try:
+                print(cursor.mogrify(query, match))
+                cursor.execute(query, match)
+            except TypeError:
+                traceback.print_exc()
+    except Exception:
         traceback.print_exc()
-        print(e)
+        raise
     else:
         db_conn.commit()
 
-    print("MATCH has been inserted!")
