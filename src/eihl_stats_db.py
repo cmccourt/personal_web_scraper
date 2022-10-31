@@ -65,13 +65,9 @@ def insert_match(match: dict, cursor: _psycopg.cursor, db_conn: _psycopg.connect
     try:
         if len(dup_matches) == 0:
             # Find duplicates using datetime home team and away team only
-            where_clause = sql.SQL(" AND ").join(sql.Composed([sql.Composed([sql.Identifier(k),
-                                                                             sql.SQL("="), sql.Placeholder(k)]) for k, v
-                                                               in
-                                                               match.items()]))
-            dup_match_sql = sql.SQL("""SELECT * FROM match WHERE "match_date" = %(match_date)s AND
-             "home_team" = %(home_team)s AND "away_team" = %(away_team)s """
-                                    )
+            # Change where clause in case there is dup matches
+            where_clause = """"match_date"=%(match_date)s AND "home_team"=%(home_team)s AND "away_team"=%(away_team)s"""
+            dup_match_sql = sql.SQL("""SELECT * FROM match WHERE {}""".format(where_clause))
             # print(cursor.mogrify(dup_match_sql, match))
             cursor.execute(dup_match_sql, {"match_date": match.get("match_date", None),
                                            "home_team": match.get("home_team", None),
@@ -89,7 +85,7 @@ def insert_match(match: dict, cursor: _psycopg.cursor, db_conn: _psycopg.connect
                 [sql.Composed([sql.Identifier(k),
                                sql.SQL("="),
                                sql.Placeholder(k)]) for k, v in match.items()]))
-            query = sql.SQL("UPDATE match SET {} WHERE {}").format(update_cols, where_clause)
+            query = sql.SQL("UPDATE match SET {} WHERE {}").format(update_cols, sql.SQL(where_clause))
             print("Match already exists")
         elif len(dup_matches) > 1:
             print(f"THERE ARE MULTIPLE MATCHES")
@@ -106,4 +102,3 @@ def insert_match(match: dict, cursor: _psycopg.cursor, db_conn: _psycopg.connect
         raise
     else:
         db_conn.commit()
-

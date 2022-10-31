@@ -63,12 +63,24 @@ def populate_all_eihl_matches(db_cur: _psycopg.cursor = None, db_conn: _psycopg.
             season_matches = get_matches(season_url)
             for match in season_matches:
                 match.update({"championship_id": season[1]})
-                insert_match(match, db_cur, db_conn)
+                insert_match(match, db_cur, db_conn, True)
 
     except Exception as e:
         traceback.print_exc()
         print(f"{e}")
         raise e
+
+
+def get_eihl_web_match_id(match_html) -> int or None:
+    a_tag = match_html.find("a")
+    game_web_id = re.findall(r"(?<=/game/).*$", a_tag.get('href', None))[0]
+    try:
+        if game_web_id:
+            return game_web_id
+    except Exception:
+        print(f"{game_web_id} is not a valid number")
+        traceback.print_exc()
+    return None
 
 
 def get_matches(url: str, filt: Callable[[str], bool] = lambda x: True):
@@ -88,6 +100,7 @@ def get_matches(url: str, filt: Callable[[str], bool] = lambda x: True):
 
         if tag.name == "div" and len(tag.find_all()) > 0:
             match_info = defaultdict()
+            match_info["eihl_web_match_id"] = get_eihl_web_match_id(tag)
             match_details = [r.text.strip() for r in tag.contents]
 
             match_details = [x for x in match_details if x.lower() not in ("", "details")]
@@ -99,7 +112,6 @@ def get_matches(url: str, filt: Callable[[str], bool] = lambda x: True):
                 match_info["match_date"] = match_date
                 match_details.insert(0, None)
 
-            test = not str.isdigit(match_details[1]) and len(match_details) > 2
             # EIHL website for older seasons have game numbers or match type between time and home team
             if str.isdigit(match_details[1]) or len(match_details) > 2:
                 del match_details[1]
