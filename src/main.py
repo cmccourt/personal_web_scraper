@@ -1,6 +1,6 @@
 import pandas as pd
 from src.Exceptions import DBNotAvailable
-from team_stats import get_team_stats
+
 
 def display_help():
     print("-build \t Create the EIHL database")
@@ -25,8 +25,8 @@ def main():
 
                 # user_input = input("Please enter your search: ")
                 user_input = ""
-                team_stats: pd.DataFrame = get_team_stats(user_input)
-                print(team_stats)
+                #team_stats: pd.DataFrame = get_team_stats(user_input)
+                #print(team_stats)
             elif user_input == '-help':
                 # Displays help list
                 display_help()

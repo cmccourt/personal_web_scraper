@@ -1,14 +1,12 @@
-import re
-from collections import defaultdict
-from datetime import datetime
-from typing import Callable
+import traceback
 
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
+
 from settings.settings import eihl_team_url, eihl_match_url
-from src.eihl_stats_db import db_connection, insert_match, db_cursor, insert_championship
-from webScraping import get_page_stats, get_html_content, get_matches, get_eihl_championship_options
+from src.eihl_stats_db import db_connection, db_cursor, insert_team_match_stats
+from webScraping import get_page_stats, populate_all_eihl_matches, get_team_match_stats
 
 """@dataclass
 class Player:
@@ -26,35 +24,47 @@ class Team:
 """
 
 
-def get_team_stats(team_name: str):
-    # "https://www.eliteleague.co.uk/team/4-belfast-giants/player-stats?id_season=37"
+def get_match_team_stats():
+    db_conn = None
+    db_cur = None
+    match_db_cursor = None
+    try:
+        db_conn = db_connection()
+        db_cur = db_cursor(db_conn)
+        # TODO find a better solution to handle DB connections and cursors
+        match_db_cursor = db_cursor(db_conn)
+        match_db_cursor.execute("SELECT * FROM match;")
+        while True:
+            match = match_db_cursor.fetchone()
+            if match is None:
+                break
 
-    team_url = f"{eihl_team_url}4-belfast-giants/player-stats?id_season=37"
-    response = requests.get(team_url)
-    res_beaus = BeautifulSoup(response.content, 'html.parser')
+            match_url = f"{eihl_match_url}{match.get('eihl_web_match_id', '')}/team-stats"
+            print(f"Next match is {match_url}")
+            match_stats = get_team_match_stats(match_url)
+            # TODO insert match stats to match_team_stats table
+            for k, team_stats in match_stats.items():
+                team_stats["team_name"] = match.get(k, None)
+                team_stats["match_id"] = match.get("match_id", None)
+                insert_team_match_stats(team_stats, db_cur, db_conn, True)
+            print(match_stats)
 
-    team_stats = get_page_stats(team_url)
-    return team_stats
+        print("COMPLETE")
+
+    except Exception:
+        traceback.print_exc()
+    finally:
+        if db_conn is not None:
+            if match_db_cursor is not None:
+                match_db_cursor.close()
+            if db_cur is not None:
+                db_cur.close()
+            db_conn.close()
 
 
 def get_players_stats(player_name: str, team_stats: pd.DataFrame = None):
     pass
 
 
-# eihl_matches = get_matches("https://www.eliteleague.co.uk/schedule?id_season=36&id_team=0&id_month=999", lambda x: True)
-db_conn = None
-db_cur = None
-try:
-    db_conn = db_connection()
-    db_cur = db_cursor(db_conn)
-    champion_options = get_eihl_championship_options()
-    print("COMPLETE")
-    for match in champion_options:
-        insert_championship(match, db_cur, db_conn)
-except Exception as e:
-    print(f"ERROR! {e}")
-finally:
-    if db_conn is not None:
-        if db_cur is not None:
-            db_cur.close()
-        db_conn.close()
+
+
