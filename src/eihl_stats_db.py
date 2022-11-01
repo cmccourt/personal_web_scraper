@@ -51,6 +51,64 @@ def insert_championship(champ: dict, cursor: _psycopg.cursor, db_conn: _psycopg.
     print("Championship has been inserted!")
 
 
+def insert_team_match_stats(team_match_stats: dict, cursor: _psycopg.cursor,
+                            db_conn: _psycopg.connection, update_exist_data: bool = False):
+    team_name = team_match_stats.get("team_name", None)
+    match_id = team_match_stats.get("match_id", None)
+    where_clause = sql.SQL(" AND ").join(sql.Composed([sql.Composed([sql.Identifier(k),
+                                                                     sql.SQL("="), sql.Placeholder(k)]) for k, v in
+                                                       team_match_stats.items()]))
+    dup_match_sql = sql.SQL("SELECT * FROM match_team_stats WHERE {}".format(
+        where_clause.as_string(db_conn)
+    ))
+    cursor.execute(dup_match_sql, team_match_stats)
+    dup_matches = cursor.fetchall()
+    query = None
+    try:
+        if len(dup_matches) == 0:
+            # Find duplicates using match ID and team name only
+            # Change where clause in case there is dup matches
+            where_clause = """"match_id"=%(match_id)s AND "team_name"=%(team_name)s"""
+            dup_match_sql = sql.SQL("""SELECT * FROM match_team_stats WHERE {}""".format(where_clause))
+            # print(cursor.mogrify(dup_match_sql, match_team_stats))
+            cursor.execute(dup_match_sql, {"match_id": match_id,
+                                           "team_name": team_name})
+            dup_matches = cursor.fetchall()
+
+        if len(dup_matches) == 0:
+            query = sql.SQL("INSERT INTO match_team_stats ({}) VALUES ({})").format(
+                sql.SQL(", ").join(map(sql.Identifier, team_match_stats)),
+                sql.SQL(", ").join(map(sql.Placeholder, team_match_stats))
+            )
+            print(f"Match ID: {match_id} team: {team_name} stats to be inserted!")
+        elif len(dup_matches) == 1 and update_exist_data:
+            update_cols = sql.SQL(", ").join(sql.Composed(
+                [sql.Composed([sql.Identifier(k),
+                               sql.SQL("="),
+                               sql.Placeholder(k)]) for k, v in team_match_stats.items()]))
+            if isinstance(where_clause, sql.Composable):
+                where_clause = where_clause.as_string(db_conn)
+            test_where = sql.SQL(where_clause)
+
+            query = sql.SQL("UPDATE match_team_stats SET {} WHERE {}").format(update_cols, test_where)
+            print(f"Updating existing stats data for match ID: {match_id}, team: {team_name}")
+        elif len(dup_matches) > 1:
+            print(f"THERE ARE MULTIPLE records for team stats for match ID {match_id}, team: {team_name}.")
+        else:
+            print(f"Match ID {match_id} team: {team_name} stats already exists in DB. Not updating it!")
+        if query is not None:
+            try:
+                print(cursor.mogrify(query, team_match_stats))
+                cursor.execute(query, team_match_stats)
+            except TypeError:
+                traceback.print_exc()
+    except Exception:
+        traceback.print_exc()
+        raise
+    else:
+        db_conn.commit()
+
+
 def insert_match(match: dict, cursor: _psycopg.cursor, db_conn: _psycopg.connection = None,
                  update_exist_data: bool = False):
     where_clause = sql.SQL(" AND ").join(sql.Composed([sql.Composed([sql.Identifier(k),

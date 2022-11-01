@@ -10,12 +10,88 @@ import requests
 from bs4 import BeautifulSoup
 from psycopg2 import _psycopg
 
-from settings.settings import eihl_match_url
+from settings.settings import eihl_schedule_url, match_team_stats_cols
 from src.eihl_stats_db import db_connection, db_cursor, insert_match
 
 
+def get_date_format(text: str, fmt: str) -> datetime or None:
+    try:
+        text_dt = datetime.strptime(text, fmt)
+        return text_dt
+    except ValueError:
+        return None
+
+
+def get_html_content(url: str) -> BeautifulSoup:
+    response = requests.get(url)
+    res_beaus = BeautifulSoup(response.content, 'html.parser')
+    return res_beaus
+
+
+def extract_float_from_str(value: str):
+    float_value = None
+    if re.findall(r"(\d+.\d+)(?=%)", value):
+        float_value = float(re.search(r"(\d+.\d+)(?=%)", value).group(1))
+    else:
+        try:
+            float_value = float(value)
+        except ValueError:
+            print(f"Float conversion failed. Value: {value}")
+    return float_value
+
+
+def get_team_match_stats(match_html: str) -> dict:
+    # find div class called container
+    # Then find an H2 called Team Stats
+    # Iterate through the stats and assign them to the right team
+    match_html_content = get_html_content(match_html)
+    home_team_stats = defaultdict()
+    away_team_stats = defaultdict()
+
+    html_container = match_html_content.findAll('div', attrs={'class': 'container'})[0]
+    stats_html: bs4.Tag = html_container.find("div")
+    test = stats_html.find("h2")
+    if "TEAM STATS" in test.get_text().upper():
+        stat_text = list(stats_html.get_text("|", strip=True).split("|"))
+        if stat_text[0].lower() == "team stats":
+            del stat_text[0]
+        # We go backwards in the loop as the stat titles are below the numbers
+        i = len(stat_text) - 1
+        while i is not None:
+            if i < 0:
+                break
+            stat = stat_text[i]
+            if not any(char.isdigit() for char in stat):
+                db_col = match_team_stats_cols.get(stat_text[i], stat_text[i])
+                # As we're going backwards the away stats will be before the home stats
+                if match_team_stats_cols.get(stat_text[i - 1], None) is not None or \
+                        match_team_stats_cols.get(stat_text[i - 2], None) is not None:
+                    home_stat = 0.0
+                    away_stat = 0.0
+                    # Only go one level down to get next stat
+                    i -= 1
+                else:
+                    away_stat = extract_float_from_str(stat_text[i - 1])
+                    if away_stat is None or away_stat == "":
+                        away_stat = 0.0
+
+                    home_stat = extract_float_from_str(stat_text[i - 2])
+                    if home_stat is None or home_stat == "":
+                        home_stat = 0.0
+                    # Go to next stat
+                    i -= 3
+                away_team_stats[db_col] = away_stat
+                home_team_stats[db_col] = home_stat
+            else:
+                # Move to next stat
+                i -= 1
+
+    match_team_stats = {"home_team": home_team_stats, "away_team": away_team_stats}
+    return match_team_stats
+
+
 def get_eihl_championship_options():
-    res_beaus = get_html_content(eihl_match_url)
+    res_beaus = get_html_content(eihl_schedule_url)
     html_id_season = res_beaus.body.find(id="id_season")
     champ_list = []
     id_search = "id_season="
@@ -32,20 +108,7 @@ def get_eihl_championship_options():
     return champ_list
 
 
-def get_date_format(text: str, format: str) -> datetime or None:
-    try:
-        text_dt = datetime.strptime(text, format)
-        return text_dt
-    except ValueError:
-        return None
-
-
-def get_html_content(url: str) -> BeautifulSoup:
-    response = requests.get(url)
-    res_beaus = BeautifulSoup(response.content, 'html.parser')
-    return res_beaus
-
-
+# TODO move function to appropriate script
 def populate_all_eihl_matches(db_cur: _psycopg.cursor = None, db_conn: _psycopg.connection = None):
     month_id = 999
     team_id = 0
@@ -59,7 +122,7 @@ def populate_all_eihl_matches(db_cur: _psycopg.cursor = None, db_conn: _psycopg.
         db_cur.execute("SELECT champion_id, eihl_web_id FROM championship WHERE eihl_web_id <> 36")
         seasons = db_cur.fetchall()
         for season in seasons:
-            season_url = f"{eihl_match_url}?id_season={season[1]}&id_team={team_id}&id_month={month_id}"
+            season_url = f"{eihl_schedule_url}?id_season={season[1]}&id_team={team_id}&id_month={month_id}"
             season_matches = get_matches(season_url)
             for match in season_matches:
                 match.update({"championship_id": season[1]})
@@ -71,8 +134,8 @@ def populate_all_eihl_matches(db_cur: _psycopg.cursor = None, db_conn: _psycopg.
         raise e
 
 
-def get_eihl_web_match_id(match_html) -> int or None:
-    a_tag = match_html.find("a")
+def get_eihl_web_match_id(match_row_html) -> int or None:
+    a_tag = match_row_html.find("a")
     game_web_id = re.findall(r"(?<=/game/).*$", a_tag.get('href', None))[0]
     try:
         if game_web_id:
