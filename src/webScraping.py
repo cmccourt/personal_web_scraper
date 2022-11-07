@@ -10,7 +10,7 @@ import requests
 from bs4 import BeautifulSoup
 from psycopg2 import _psycopg
 
-from settings.settings import eihl_schedule_url, match_team_stats_cols
+from settings.settings import eihl_schedule_url, match_team_stats_cols, match_player_stats_cols
 from src.eihl_stats_db import db_connection, db_cursor, insert_match
 
 
@@ -223,12 +223,49 @@ def get_ignore_words():
     return ignore_words
 
 
-def get_page_stats(url: str):
-    page_html_tables = pd.read_html(url)
-    if len(page_html_tables) > 0:
-        return pd.concat(page_html_tables, ignore_index=False)
-    else:
-        return page_html_tables
+def get_page_stats(url: str) -> defaultdict:
+    response = requests.get(url)
+    res_beaus = BeautifulSoup(response.content, 'html.parser')
+    html_container = res_beaus.find('div', attrs={'class': 'container'})
+    # html_container: bs4.Tag = html_container.find("div")
+    game_stats = defaultdict(pd.DataFrame)
+    pg_header_regex = re.compile("(?<= -).players|(?<= -).goalies")
+    all_player_headers = [x for x in html_container.find_all("h2")
+                          if re.search(pg_header_regex, x.get_text()) is not None]
+    head_index = 0
+    player_head_len = len(all_player_headers)
+    while head_index < player_head_len:
+        next_head_tag = None
+        table_tag = None
+        player_stat_dtf = pd.DataFrame()
+        team_name = all_player_headers[head_index].get_text().strip().split("-")[0]
+        team_name = team_name.strip()
+        # Working with 0 index notation
+        if head_index + 1 < player_head_len:
+            next_head_tag = all_player_headers[head_index + 1]
+        for tag in all_player_headers[head_index].next_siblings:
+            if next_head_tag is not None and tag is next_head_tag:
+                break
+            elif isinstance(tag, bs4.Tag):
+                table_tag = tag.findChildren("table", limit=1)
+                if table_tag is not None:
+                    table_tag = tag
+                    break
+        # TODO Change if statement to try except
+        if isinstance(table_tag, bs4.Tag):
+            try:
+                player_stat_dtf = pd.read_html(str(table_tag))[0]
+                player_stat_dtf = player_stat_dtf.rename(columns=match_player_stats_cols)
+            except ValueError:
+                print(f"ERROR No tables found for: {table_tag}")
+        # if not player_stat_dtf.empty and game_stats.get(team_name, None) is not None:
+        #     game_stats[team_name] = pd.concat([game_stats[team_name], player_stat_dtf], ignore_index=False)
+        # elif not player_stat_dtf.empty:
+        # else:
+        #     game_stats[team_name] = pd.concat([game_stats[team_name], player_stat_dtf], ignore_index=False)
+        game_stats[team_name] = pd.concat([game_stats[team_name], player_stat_dtf], ignore_index=False)
+        head_index += 1
+    return game_stats
 
 
 def get_page_text(url: str, ignore_words: list = None) -> str:

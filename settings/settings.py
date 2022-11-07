@@ -15,6 +15,7 @@ eihl_team_url = f"{eihl_base_url}team/"
 eihl_schedule_url = f"{eihl_base_url}schedule/"
 eihl_match_url = f"{eihl_base_url}game/"
 
+
 match_team_stats_cols = {
     "Shots": "shots",
     "Shots on goal": "shots_on_goal",
@@ -26,6 +27,30 @@ match_team_stats_cols = {
     "Saves": "saves",
     "Save percentage": "save_percentage",
     "Faceoffs won": "faceoffs_won"
+}
+
+match_player_stats_cols = {
+    "Jersey": "jersey",
+    "Player name": "player_name",
+    "Position": "position",
+    "G": "goals",
+    "A": "assists",
+    "PTS": "points",
+    "PIM": "penalty_mins",
+    "PPG": "power_play_goals",
+    "SHG": "short_hand_goals",
+    "+/-": "+/-",
+    "SOG": "shots_on_goal",
+    "S": "shots",
+    "FOW": "face_offs_won",
+    "FOL": "face_offs_lost",
+    "W": "wins",
+    "L": "losts",
+    "SO": "shutouts",
+    "SA": "shots_against",
+    "GA": "goals_against",
+    "MIN": "mins_played",
+    "SVS%": "save_percentage"
 }
 
 eihl_teams = [
