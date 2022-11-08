@@ -1,5 +1,14 @@
 import pandas as pd
+from enum import Enum
 from src.Exceptions import DBNotAvailable
+from src.team_stats import get_all_players_stats, get_match_team_stats
+from src.match import populate_all_eihl_matches
+
+
+class Options(Enum):
+    GET_MATCHES = "--get_match_scores"
+    GET_TEAM_MATCH_STATS = "--get_team_match_stats"
+    GET_PLAYER_MATCH_STATS = "--get_player_match_stats"
 
 
 def display_help():
@@ -21,13 +30,13 @@ def main():
             user_input = input("What would you like to do? ->")
             if user_input is None:
                 continue
-            elif user_input == "-search":
-
-                # user_input = input("Please enter your search: ")
-                user_input = ""
-                #team_stats: pd.DataFrame = get_team_stats(user_input)
-                #print(team_stats)
-            elif user_input == '-help':
+            elif user_input == "-update_match_scores":
+                populate_all_eihl_matches()
+            elif user_input == '-update_player_match_stats':
+                get_all_players_stats()
+            elif user_input == '-update_team_match_stats':
+                get_match_team_stats()
+            elif user_input == "-help":
                 # Displays help list
                 display_help()
             elif user_input == '-exit':

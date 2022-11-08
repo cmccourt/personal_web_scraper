@@ -11,7 +11,7 @@ from bs4 import BeautifulSoup
 from psycopg2 import _psycopg
 
 from settings.settings import eihl_schedule_url, match_team_stats_cols, match_player_stats_cols
-from src.eihl_stats_db import db_connection, db_cursor, insert_match
+from src.eihl_stats_db import insert_match, get_eihl_season_ids
 
 
 def get_date_format(text: str, fmt: str) -> datetime or None:
@@ -106,32 +106,6 @@ def get_eihl_championship_options():
             print(traceback.print_exc())
         print(s_id)
     return champ_list
-
-
-# TODO move function to appropriate script
-def populate_all_eihl_matches(db_cur: _psycopg.cursor = None, db_conn: _psycopg.connection = None):
-    month_id = 999
-    team_id = 0
-    matches = []
-    if db_cur is None:
-        if db_conn is None:
-            db_conn = db_connection()
-        db_cur = db_cursor(db_conn)
-    try:
-        # get all EIHL season ids to iterate through
-        db_cur.execute("SELECT champion_id, eihl_web_id FROM championship WHERE eihl_web_id <> 36")
-        seasons = db_cur.fetchall()
-        for season in seasons:
-            season_url = f"{eihl_schedule_url}?id_season={season[1]}&id_team={team_id}&id_month={month_id}"
-            season_matches = get_matches(season_url)
-            for match in season_matches:
-                match.update({"championship_id": season[1]})
-                insert_match(match, db_cur, db_conn, True)
-
-    except Exception as e:
-        traceback.print_exc()
-        print(f"{e}")
-        raise e
 
 
 def get_eihl_web_match_id(match_row_html) -> int or None:
