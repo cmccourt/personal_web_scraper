@@ -23,5 +23,3 @@ def populate_all_eihl_matches():
     except Exception:
         traceback.print_exc()
 
-
-populate_all_eihl_matches()

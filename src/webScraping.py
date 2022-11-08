@@ -4,14 +4,12 @@ from collections import defaultdict
 from datetime import datetime
 from typing import Callable
 
-import pandas as pd
 import bs4
+import pandas as pd
 import requests
 from bs4 import BeautifulSoup
-from psycopg2 import _psycopg
 
 from settings.settings import eihl_schedule_url, match_team_stats_cols, match_player_stats_cols
-from src.eihl_stats_db import insert_match, get_eihl_season_ids
 
 
 def get_date_format(text: str, fmt: str) -> datetime or None:
@@ -232,11 +230,6 @@ def get_page_stats(url: str) -> defaultdict:
                 player_stat_dtf = player_stat_dtf.rename(columns=match_player_stats_cols)
             except ValueError:
                 print(f"ERROR No tables found for: {table_tag}")
-        # if not player_stat_dtf.empty and game_stats.get(team_name, None) is not None:
-        #     game_stats[team_name] = pd.concat([game_stats[team_name], player_stat_dtf], ignore_index=False)
-        # elif not player_stat_dtf.empty:
-        # else:
-        #     game_stats[team_name] = pd.concat([game_stats[team_name], player_stat_dtf], ignore_index=False)
         game_stats[team_name] = pd.concat([game_stats[team_name], player_stat_dtf], ignore_index=False)
         head_index += 1
     return game_stats
