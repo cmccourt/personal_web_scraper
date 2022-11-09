@@ -6,7 +6,7 @@ from src.eihl_stats_db import insert_team_match_stats, insert_player_match_stats
 from webScraping import get_page_stats, get_team_match_stats
 
 
-def get_match_team_stats():
+def update_match_team_stats():
     try:
         while True:
             match = get_next_match()
@@ -24,7 +24,7 @@ def get_match_team_stats():
         traceback.print_exc()
 
 
-def get_all_players_stats():
+def update_all_players_stats():
     try:
         while True:
             match = get_next_match()

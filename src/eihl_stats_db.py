@@ -102,6 +102,7 @@ class PostgresDB:
             if db_cur is not None:
                 db_cur.close()
 
+
 def get_next_match(db_cur: _psycopg.cursor = None, db_conn: _psycopg.connection = None):
     if db_conn is None:
         db_conn = PostgresDB.get_db_conn()
@@ -210,7 +211,7 @@ def insert_team_match_stats(team_match_stats: dict, db_object=None, update_exist
             print(f"Match ID {match_id} team: {team_name} stats already exists in DB. Not updating it!")
         if query is not None:
             try:
-                #print(db_cur.mogrify(query, team_match_stats))
+                # print(db_cur.mogrify(query, team_match_stats))
                 db_object.execute_query(query, team_match_stats)
             except TypeError:
                 traceback.print_exc()
@@ -291,6 +292,7 @@ def insert_match(match: dict, db_object=None, update_exist_data: bool = False):
         if len(dup_matches) == 0:
             # Find duplicates using datetime home team and away team only
             # Change where clause in case there is dup matches
+            # TODO SQL INJECTION ALERT!
             where_clause = "\"match_date\"=%(match_date)s AND \"home_team\"=%(home_team)s AND \"away_team\"=%(away_team)s"
             dup_match_sql = sql.SQL("""SELECT * FROM match WHERE {}""".format(where_clause))
             # print(cursor.mogrify(dup_match_sql, match))

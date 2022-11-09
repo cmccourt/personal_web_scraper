@@ -1,23 +1,35 @@
+import dataclasses
+import traceback
+from typing import Callable
+
 import pandas as pd
 from enum import Enum
 from src.Exceptions import DBNotAvailable
-from src.team_stats import get_all_players_stats, get_match_team_stats
+from src.team_stats import update_all_players_stats, update_match_team_stats
 from src.match import populate_all_eihl_matches
 
 
-class Options(Enum):
-    GET_MATCHES = "--get_match_scores"
-    GET_TEAM_MATCH_STATS = "--get_team_match_stats"
-    GET_PLAYER_MATCH_STATS = "--get_player_match_stats"
+@dataclasses.dataclass(init=True)
+class CMDOption:
+    help: str or None
+    action: Callable
 
 
 def display_help():
-    print("-build \t Create the EIHL database")
-    print("-dump \t Save the EIHL database")
-    print("-restore \t Retrieve the EIHL database")
-    print("-print \t Show the EIHL database")
-    print("-help \t Show this help information")
-    print("-exit \t Exit the EIHL search engine")
+    print("Help\n")
+    for option in Options:
+        print(f"{option.name}: {option.value.help}")
+
+
+class Options(Enum):
+    GET_MATCH_SCORE = CMDOption("Get score for match", lambda x: True)
+    GET_TEAM_MATCH_STATS = CMDOption("Get team's stats for a particular match.", lambda x: True)
+    GET_PLAYER_MATCH_STATS = CMDOption("Get player's stats for a particular match", lambda x: True)
+    UPDATE_PLAYER_MATCH_STATS = CMDOption("Update player's stats for a particular match", update_all_players_stats)
+    UPDATE_TEAM_MATCH_STATS = CMDOption("Update team's stats for a particular match", update_match_team_stats)
+    UPDATE_MATCH_SCORES = CMDOption("Update DB with the latest EIHL matches", populate_all_eihl_matches)
+    HELP = CMDOption("You know what this does you eejit!", display_help)
+    EXIT = CMDOption("Exit the program", exit)
 
 
 def main():
@@ -26,26 +38,14 @@ def main():
 
     is_exit = False
     while not is_exit:
+        user_input = input("What would you like to do? ->")
+        if user_input is None:
+            continue
         try:
-            user_input = input("What would you like to do? ->")
-            if user_input is None:
-                continue
-            elif user_input == "-update_match_scores":
-                populate_all_eihl_matches()
-            elif user_input == '-update_player_match_stats':
-                get_all_players_stats()
-            elif user_input == '-update_team_match_stats':
-                get_match_team_stats()
-            elif user_input == "-help":
-                # Displays help list
-                display_help()
-            elif user_input == '-exit':
-                # Exits the application
-                is_exit = True
-            else:
-                print("ERROR! This is not a valid option. Use -help for list of functions")
-        except DBNotAvailable:
-            print("ERROR! There is no database available. Please restore or build it")
+            Options[user_input].value.action()
+        except KeyError:
+            traceback.print_exc()
+            print("This is a invalid option!")
 
 
 if __name__ == "__main__":

@@ -8,8 +8,6 @@ from src.webScraping import get_matches
 def populate_all_eihl_matches():
     month_id = 999
     team_id = 0
-    matches = []
-
     try:
         # get all EIHL season ids to iterate through
         seasons = get_eihl_season_ids()
