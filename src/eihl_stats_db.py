@@ -117,7 +117,6 @@ def get_next_match(db_cur: _psycopg.cursor = None, db_conn: _psycopg.connection 
                 break
             else:
                 yield match
-        yield None
     except Exception:
         traceback.print_exc()
     finally:
@@ -133,6 +132,37 @@ def get_eihl_season_ids(db_object=None):
     except psycopg2.ProgrammingError:
         seasons = None
     return seasons
+
+
+def get_db_match(params, where_clause=None, db_object=None):
+    if db_object is None:
+        db_object = PostgresDB()
+    if where_clause is None:
+        where_clause = sql.SQL(" AND ").join(sql.Composed([sql.Composed([sql.Identifier(k),
+                                                                         sql.SQL("="), sql.Placeholder(k)]) for k, v in
+                                                           params.items()]))
+    dup_match_sql = sql.SQL("SELECT * FROM match WHERE {}".format(
+        db_object.as_string(where_clause)
+    ))
+    dup_matches = db_object.read_all_data(dup_match_sql, params)
+    return dup_matches
+
+
+def get_db_match_stats(params, db_object=None):
+    if db_object is None:
+        db_object = PostgresDB()
+
+    where_clause = sql.SQL(" AND ").join(sql.Composed([sql.Composed([sql.Identifier(k),
+                                                                     sql.SQL("="), sql.Placeholder(k)]) for k, v in
+                                                       params.items()]))
+    dup_match_sql = sql.SQL("SELECT * FROM match_team_stats WHERE {}".format(
+        db_object.as_string(where_clause)
+    ))
+    try:
+        match = db_object.read_all_data(dup_match_sql, params)[0]
+    except (psycopg2.Error, Exception):
+        match = None
+    return match
 
 
 def insert_championship(champ: dict, db_object=None):
@@ -168,6 +198,7 @@ def insert_team_match_stats(team_match_stats: dict, db_object=None, update_exist
 
     team_name = team_match_stats.get("team_name", None)
     match_id = team_match_stats.get("match_id", None)
+
     where_clause = sql.SQL(" AND ").join(sql.Composed([sql.Composed([sql.Identifier(k),
                                                                      sql.SQL("="), sql.Placeholder(k)]) for k, v in
                                                        team_match_stats.items()]))
@@ -283,10 +314,7 @@ def insert_match(match: dict, db_object=None, update_exist_data: bool = False):
     where_clause = sql.SQL(" AND ").join(sql.Composed([sql.Composed([sql.Identifier(k),
                                                                      sql.SQL("="), sql.Placeholder(k)]) for k, v in
                                                        match.items()]))
-    dup_match_sql = sql.SQL("SELECT * FROM match WHERE {}".format(
-        db_object.as_string(where_clause)
-    ))
-    dup_matches = db_object.read_all_data(dup_match_sql, match)
+    dup_matches = get_db_match(match, where_clause, db_object=db_object)
     query = None
     try:
         if len(dup_matches) == 0:
@@ -294,11 +322,8 @@ def insert_match(match: dict, db_object=None, update_exist_data: bool = False):
             # Change where clause in case there is dup matches
             # TODO SQL INJECTION ALERT!
             where_clause = "\"match_date\"=%(match_date)s AND \"home_team\"=%(home_team)s AND \"away_team\"=%(away_team)s"
-            dup_match_sql = sql.SQL("""SELECT * FROM match WHERE {}""".format(where_clause))
-            # print(cursor.mogrify(dup_match_sql, match))
-            db_object.read_all_data(dup_match_sql, {"match_date": match.get("match_date", None),
-                                                    "home_team": match.get("home_team", None),
-                                                    "away_team": match.get("away_team", None)})
+            dup_matches = get_db_match(match, where_clause, db_object=db_object)
+
         if len(dup_matches) == 0:
             query = sql.SQL("INSERT INTO match ({}) VALUES ({})").format(
                 sql.SQL(", ").join(map(sql.Identifier, match)),
