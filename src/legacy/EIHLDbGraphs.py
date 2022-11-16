@@ -1,6 +1,6 @@
 import pickle
 
-from src.data_objects import URLGraph, PageRank, IndexGraph
+from src.legacy.data_objects import URLGraph, PageRank, IndexGraph
 
 
 class EIHLDbGraphs:
