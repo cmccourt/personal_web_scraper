@@ -3,7 +3,7 @@ import pandas as pd
 
 from settings.settings import eihl_match_url
 from src.eihl_stats_db import insert_team_match_stats, insert_player_match_stats, get_next_match
-from webScraping import get_page_stats, get_team_match_stats
+from webScraping import get_page_stats, extract_team_match_stats
 
 
 def update_match_team_stats():
@@ -14,7 +14,7 @@ def update_match_team_stats():
                 break
             match_url = f"{eihl_match_url}{match.get('eihl_web_match_id', '')}/team-stats"
             print(f"Next match is {match_url}")
-            match_stats = get_team_match_stats(match_url)
+            match_stats = extract_team_match_stats(match_url)
             for k, team_stats in match_stats.items():
                 team_stats["team_name"] = match.get(k, None)
                 team_stats["match_id"] = match.get("match_id", None)

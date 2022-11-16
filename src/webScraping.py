@@ -9,7 +9,7 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
-from settings.settings import eihl_schedule_url, match_team_stats_cols, match_player_stats_cols
+from settings.settings import eihl_schedule_url, match_team_stats_cols, match_player_stats_cols, eihl_base_url
 
 
 def get_date_format(text: str, fmt: str) -> datetime or None:
@@ -38,7 +38,7 @@ def extract_float_from_str(value: str):
     return float_value
 
 
-def get_team_match_stats(match_html: str) -> dict:
+def extract_team_match_stats(match_html: str) -> dict:
     # find div class called container
     # Then find an H2 called Team Stats
     # Iterate through the stats and assign them to the right team
