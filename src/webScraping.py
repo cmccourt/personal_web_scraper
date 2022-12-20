@@ -9,7 +9,7 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
-from settings.settings import eihl_schedule_url, match_team_stats_cols, match_player_stats_cols, eihl_base_url
+from settings.settings import eihl_schedule_url, match_team_stats_cols, match_player_stats_cols
 
 
 def get_date_format(text: str, fmt: str) -> datetime or None:
@@ -88,8 +88,8 @@ def extract_team_match_stats(match_html: str) -> dict:
     return match_team_stats
 
 
-def get_eihl_championship_options():
-    res_beaus = get_html_content(eihl_schedule_url)
+def get_eihl_championship_options(schedule_url: str = eihl_schedule_url):
+    res_beaus = get_html_content(schedule_url)
     html_id_season = res_beaus.body.find(id="id_season")
     champ_list = []
     id_search = "id_season="
@@ -127,60 +127,62 @@ def get_matches(url: str, filt: Callable[[str], bool] = lambda x: True):
     matches = []
     match_date = None
     for tag in html_content:
-
         game_date_text = tag.get_text()
         game_date = get_date_format(game_date_text, "%A %d.%m.%Y")
         if game_date is not None and match_date != game_date_text:
             match_date = game_date
 
         if tag.name == "div" and len(tag.find_all()) > 0:
-            match_info = defaultdict()
-            match_info["eihl_web_match_id"] = get_eihl_web_match_id(tag)
-            match_details = [r.text.strip() for r in tag.contents]
-
-            match_details = [x for x in match_details if x.lower() not in ("", "details")]
-            try:
-                match_info["match_date"] = datetime.combine(match_date,
-                                                            get_date_format(match_details[0], "%H:%M").time())
-            except AttributeError:
-                # There was no time present. Created dummy placeholder
-                match_info["match_date"] = match_date
-                match_details.insert(0, None)
-
-            # EIHL website for older seasons have game numbers or match type between time and home team
-            if str.isdigit(match_details[1]) or len(match_details) > 2:
-                del match_details[1]
-
-            match_details[1] = match_details[1].replace("\n", "").strip()
-            match_details[1] = re.sub('  +', '\t', match_details[1])
-            match_details[1] = (match_details[1].split("\t"))
-            match_info["home_team"] = match_details[1][0]
-            match_info["away_team"] = match_details[1][-1]
-
-            # if match went to OT or SO then we need to separate that
-            try:
-                score = match_details[1][1].split(":")
-            except IndexError:
-                print(type(match_details[1]))
-                traceback.print_exc()
-                print(match_details)
-            else:
-                if score[0] != "-":
-                    match_info["home_score"] = int(score[0])
-                    # OT or SO could be in string
-                    try:
-                        away_score, match_type = score[1].split(" ")
-                    except ValueError:
-                        away_score = score[1]
-                        match_type = "R"
-                    match_info["away_score"] = int(away_score)
-                    match_info["match_win_type"] = match_type
-                else:
-                    match_info["home_score"] = None
-                    match_info["away_score"] = None
-                    match_info["match_win_type"] = None
-                matches.append(match_info)
+            match_info = extract_match_info(matches, tag, match_date)
+            matches.append(match_info)
     return matches
+
+
+def extract_match_info(matches, tag, match_date=None):
+    match_info = defaultdict()
+    match_info["eihl_web_match_id"] = get_eihl_web_match_id(tag)
+    match_details = [r.text.strip() for r in tag.contents]
+    match_details = [x for x in match_details if x.lower() not in ("", "details")]
+
+    match_info["match_date"] = match_date
+    try:
+        match_time = get_date_format(match_details[0], "%H:%M").time()
+        match_info["match_date"] = datetime.combine(match_date, match_time)
+    except AttributeError:
+        # no time present. Created dummy placeholder
+        match_details.insert(0, None)
+
+    # EIHL website for older seasons have game numbers or match type between time and home team
+    if str.isdigit(match_details[1]) or len(match_details) > 2:
+        del match_details[1]
+    match_details[1] = match_details[1].replace("\n", "").strip()
+    match_details[1] = re.sub('  +', '\t', match_details[1])
+    match_details[1] = (match_details[1].split("\t"))
+    match_info["home_team"] = match_details[1][0]
+    match_info["away_team"] = match_details[1][-1]
+    # if match went to OT or SO then we need to separate that
+    try:
+        score = match_details[1][1].split(":")
+    except IndexError:
+        print(type(match_details[1]))
+        traceback.print_exc()
+        print(match_details)
+    else:
+        if score[0] != "-":
+            match_info["home_score"] = int(score[0])
+            # OT or SO could be in string
+            try:
+                away_score, match_type = score[1].split(" ")
+            except ValueError:
+                away_score = score[1]
+                match_type = "R"
+            match_info["away_score"] = int(away_score)
+            match_info["match_win_type"] = match_type
+        else:
+            match_info["home_score"] = None
+            match_info["away_score"] = None
+            match_info["match_win_type"] = None
+    return match_info
 
 
 def get_ignore_words():
@@ -195,7 +197,7 @@ def get_ignore_words():
     return ignore_words
 
 
-def get_page_stats(url: str) -> defaultdict:
+def get_match_player_stats(url: str) -> defaultdict[pd.DataFrame]:
     response = requests.get(url)
     res_beaus = BeautifulSoup(response.content, 'html.parser')
     html_container = res_beaus.find('div', attrs={'class': 'container'})
