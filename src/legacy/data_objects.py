@@ -1,9 +1,9 @@
 import pickle
 from collections import defaultdict
 
-from src import webcrawler
 from src.Exceptions import DBNotAvailable
-from src.webScraping import get_page_text
+from src.legacy import webcrawler
+from src.utils import get_page_text
 
 
 class BaseDBData:
