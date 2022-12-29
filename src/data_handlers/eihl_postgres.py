@@ -32,7 +32,7 @@ class PostgresDBPool:
         print("Postgres DB Pool is closed")
 
 
-class EIHLDBHandler:
+class EIHLPostgresHandler:
 
     def __init__(self, db_conn=None, db_cur=None):
         if not db_conn:

@@ -4,13 +4,14 @@ from datetime import datetime
 from enum import Enum
 from typing import Callable
 
-from src.eihl_stats_db import EIHLDBHandler
+from src.data_handlers.eihl_postgres import EIHLPostgresHandler
 from src.match import insert_all_eihl_matches
 from src.player_stats import insert_all_players_stats
 from src.team_stats import update_match_team_stats
 
 # TODO make builder function to get data source handler
-ds_handler = EIHLDBHandler()
+# TODO Create a MySQL handler
+ds_handler = EIHLPostgresHandler()
 
 
 @dataclasses.dataclass(init=True)

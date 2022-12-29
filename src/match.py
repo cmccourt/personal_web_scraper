@@ -2,8 +2,8 @@ import traceback
 from pprint import pprint
 
 from settings.settings import eihl_schedule_url, eihl_match_url
-from src.eihl_stats_db import EIHLDBHandler
-from src.webScraping import get_matches, get_match_player_stats
+from src.data_handlers.eihl_postgres import EIHLPostgresHandler
+from src.web_scraping.eihl_website_scraping import get_matches, get_match_player_stats
 
 
 def get_gamecentre_month_id(month_num: int = None) -> int:
@@ -66,7 +66,7 @@ def get_match_stats(match_stats_url):
     return match_stats
 
 
-def insert_match(data_src_hndlr: EIHLDBHandler, match: dict):
+def insert_match(data_src_hndlr: EIHLPostgresHandler, match: dict):
     try:
         contains_dups = data_src_hndlr.check_for_dups(params=match, table="match")
         if contains_dups:
@@ -84,7 +84,7 @@ def insert_match(data_src_hndlr: EIHLDBHandler, match: dict):
         traceback.print_exc()
 
 
-def insert_championship(data_source_hdlr: EIHLDBHandler, champ: dict):
+def insert_championship(data_source_hdlr: EIHLPostgresHandler, champ: dict):
     try:
         if data_source_hdlr.check_for_dups(params=champ, table="championship"):
             data_source_hdlr.insert_data("championship", champ)
