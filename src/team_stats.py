@@ -39,6 +39,6 @@ def update_match_team_stats(ds_handler: EIHLPostgresHandler, match_stats: dict):
             # TODO data source handler should handle column name conversions
             team_stats["team_name"] = match_stats.get(k, None)
             team_stats["match_id"] = match_stats.get("match_id", None)
-            ds_handler.insert_team_match_stats(team_stats, update_exist_data=True)
+            insert_team_match_stats(ds_handler, team_stats)
     except Exception:
         traceback.print_exc()
