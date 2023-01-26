@@ -9,6 +9,14 @@ class EIHLStatsDBConfig:
     db = "eihlstats"
 
 
+@dataclass
+class MySQLDBConfig:
+    hostname = "localhost"
+    un = "root"
+    pw = "@6Lo5weLL"
+    db = "eihlstats"
+    port = "3306"
+
 # TODO create team URLs here
 eihl_base_url = "https://www.eliteleague.co.uk/"
 eihl_team_url = f"{eihl_base_url}team/"

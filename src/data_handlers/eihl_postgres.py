@@ -11,8 +11,6 @@ def generate_and_where_clause(params):
     return sql.SQL(" AND ").join(sql.Composed([sql.Composed([sql.Identifier(k),
                                                              sql.SQL("="), sql.Placeholder(k)]) for k, v in
                                                params.items()]))
-
-
 class PostgresDBPool:
     db_conn_pool = pool.ThreadedConnectionPool(1, 20, user=EIHLStatsDBConfig.un,
                                                password=EIHLStatsDBConfig.pw,
@@ -33,6 +31,29 @@ class PostgresDBPool:
 
 
 class EIHLPostgresHandler:
+    match_player_stats_cols = {
+        "Jersey": "jersey",
+        "Player name": "player_name",
+        "Position": "position",
+        "G": "goals",
+        "A": "assists",
+        "PTS": "points",
+        "PIM": "penalty_mins",
+        "PPG": "power_play_goals",
+        "SHG": "short_hand_goals",
+        "+/-": "+/-",
+        "SOG": "shots_on_goal",
+        "S": "shots",
+        "FOW": "face_offs_won",
+        "FOL": "face_offs_lost",
+        "W": "wins",
+        "L": "losts",
+        "SO": "shutouts",
+        "SA": "shots_against",
+        "GA": "goals_against",
+        "MIN": "mins_played",
+        "SVS%": "save_percentage"
+    }
 
     def __init__(self, db_conn=None, db_cur=None):
         if not db_conn:

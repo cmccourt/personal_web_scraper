@@ -9,7 +9,7 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
-from settings.settings import eihl_schedule_url, match_team_stats_cols, match_player_stats_cols
+from settings.settings import eihl_schedule_url, match_team_stats_cols, eihl_match_url
 from src.utils import get_date_format, extract_float_from_str, get_html_content
 
 
@@ -35,6 +35,7 @@ def extract_team_match_stats(match_html: str) -> dict:
                 break
             stat = stat_text[i]
             if not any(char.isdigit() for char in stat):
+                # TODO replace dependency to db columns
                 db_col = match_team_stats_cols.get(stat_text[i], stat_text[i])
                 # As we're going backwards the away stats will be before the home stats
                 if match_team_stats_cols.get(stat_text[i - 1], None) is not None or \
@@ -93,6 +94,25 @@ def get_eihl_web_match_id(match_row_html) -> int or None:
     return None
 
 
+def get_match_html_tags(url: str) -> list[(bs4.Tag, datetime.date)]:
+    res_beaus = get_html_content(url)
+
+    html_content = res_beaus.find("body").find("main").find(class_="wrapper")
+    html_content = html_content.find(class_="container-fluid text-center text-md-left")
+
+    matches = []
+    match_date = None
+    for tag in html_content:
+        game_date_text = tag.get_text()
+        game_date = get_date_format(game_date_text, "%A %d.%m.%Y")
+        if game_date is not None and match_date != game_date_text:
+            match_date = game_date
+
+        if tag.name == "div" and len(tag.find_all()) > 0:
+            matches.append((tag, match_date))
+    return matches
+
+
 def get_matches(url: str, filt: Callable[[str], bool] = lambda x: True):
     res_beaus = get_html_content(url)
 
@@ -108,12 +128,12 @@ def get_matches(url: str, filt: Callable[[str], bool] = lambda x: True):
             match_date = game_date
 
         if tag.name == "div" and len(tag.find_all()) > 0:
-            match_info = extract_match_info(matches, tag, match_date)
+            match_info = extract_match_info(tag, match_date)
             matches.append(match_info)
     return matches
 
 
-def extract_match_info(matches, tag, match_date=None):
+def extract_match_info(tag, match_date=None):
     match_info = defaultdict()
     match_info["eihl_web_match_id"] = get_eihl_web_match_id(tag)
     match_details = [r.text.strip() for r in tag.contents]
@@ -192,7 +212,6 @@ def get_match_player_stats(url: str) -> defaultdict[pd.DataFrame]:
         if isinstance(table_tag, bs4.Tag):
             try:
                 player_stat_dtf = pd.read_html(str(table_tag))[0]
-                player_stat_dtf = player_stat_dtf.rename(columns=match_player_stats_cols)
             except ValueError:
                 print(f"ERROR No tables found for: {table_tag}")
         game_stats[team_name] = pd.concat([game_stats[team_name], player_stat_dtf], ignore_index=False)
@@ -200,3 +219,44 @@ def get_match_player_stats(url: str) -> defaultdict[pd.DataFrame]:
     return game_stats
 
 
+def get_gamecentre_month_id(month_num: int = None) -> int:
+    """
+
+    Args:
+        month_num: the month of the year in number form (e.g. January = 1, March = 3, October = 10 etc)
+
+    Returns: month ID
+
+    """
+    if month_num is None:
+        return 999
+    elif month_num > 12:
+        print(f"Month number {month_num} is Invalid")
+    return month_num
+
+
+# TODO finish function
+def get_gamecentre_team_id(team_name: str = None):
+    if team_name is None:
+        return 0
+    else:
+        return team_name
+
+
+def get_gamecentre_url(team_id: int, month_id: int, season_id: int, base_url: str = eihl_schedule_url) -> str:
+    season_url = f"{base_url}?id_season={season_id}&id_team={team_id}&id_month={month_id}"
+    return season_url
+
+
+def get_eihl_match_url(match_id: int, base_url: str = eihl_match_url) -> str:
+    match_url = f"{base_url}{match_id}/team-stats"
+    return match_url
+
+
+def get_match_stats(match_stats_url):
+    print(f"\nNext match is {match_stats_url}\n")
+    match_stats = get_match_player_stats(match_stats_url)
+    # Check if the team score table came through
+    if len(match_stats) > 4 and len(match_stats[0].columns) <= 4:
+        del match_stats[0]
+    return match_stats

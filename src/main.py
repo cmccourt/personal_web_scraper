@@ -4,21 +4,22 @@ from datetime import datetime
 from enum import Enum
 from typing import Callable
 
-from src.data_handlers.eihl_postgres import EIHLPostgresHandler
-from src.match import insert_all_eihl_matches
+from src.data_handlers.eihl_mysql import EIHLMysqlHandler
+# from src.data_handlers.eihl_postgres import EIHLPostgresHandler
+from src.match import insert_all_eihl_matches_to_db
 from src.player_stats import insert_all_players_stats
 from src.team_stats import update_match_team_stats
 
 # TODO make builder function to get data source handler
-# TODO Create a MySQL handler
-ds_handler = EIHLPostgresHandler()
+# ds_handler = EIHLPostgresHandler()
+ds_handler = EIHLMysqlHandler()
 
 
 @dataclasses.dataclass(init=True)
 class CMDOption:
     help: str or None
     action: Callable
-    params: None = None
+    params: object or None = None
 
 
 def display_help():
@@ -43,18 +44,17 @@ def get_data_range() -> tuple[datetime, datetime]:
         if start_date > end_date:
             print("Start date after end_date. Try again.")
         else:
-            break
-    return start_date, end_date
+            return start_date, end_date
 
 
+# TODO Add option for updating championships
 class Options(Enum):
-    GET_MATCH_SCORE = CMDOption("Get score for match", lambda x: True)
-    GET_TEAM_MATCH_STATS = CMDOption("Get team's stats for a particular match.", lambda x: True)
-    GET_PLAYER_MATCH_STATS = CMDOption("Get player's stats for a particular match", lambda x: True)
     UPDATE_PLAYER_MATCH_STATS = CMDOption("Update player's stats for a particular match", insert_all_players_stats)
     UPDATE_TEAM_MATCH_STATS = CMDOption("Update team's stats for a particular match", update_match_team_stats)
-    UPDATE_MATCH_SCORES = CMDOption("Update DB with the latest EIHL matches", insert_all_eihl_matches)
-    CHANGE_DATA_SOURCE = CMDOption("Change Data Source", lambda x: "This will be implemented in the future")
+    # UPDATE_CHAMPIONSHIPS = CMDOption("Update team's stats for a particular match", update_match_team_stats)
+    UPDATE_MATCH_SCORES = CMDOption("Update DB with the latest EIHL matches", insert_all_eihl_matches_to_db, ds_handler)
+    CHANGE_WEBSITE = CMDOption("Change Data Source", lambda x: "This will be implemented in the future")
+    CHANGE_DATABASE = CMDOption("Change Database", lambda x: "This will be implemented in the future")
     HELP = CMDOption("You know what this function works you eejit!", display_help)
     EXIT = CMDOption("Exit the program", exit)
 
