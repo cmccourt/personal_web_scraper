@@ -31,7 +31,6 @@ def player_stats_producer(stat_queue, matches):
         traceback.print_exc()
 
 
-# TODO check how to break out of infinite loop
 def player_stats_consumer(stat_queue, db_object_func):
     print("Consumer: Running")
     db_handler = db_object_func()

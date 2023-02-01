@@ -212,11 +212,14 @@ def get_match_player_stats(url: str) -> defaultdict[pd.DataFrame]:
         if isinstance(table_tag, bs4.Tag):
             try:
                 player_stat_dtf = pd.read_html(str(table_tag))[0]
-
             except ValueError:
                 print(f"ERROR No tables found for: {table_tag}")
-        game_stats[team_name] = pd.concat([game_stats[team_name], player_stat_dtf], ignore_index=False)
-        game_stats[team_name]["Position"] = game_stats[team_name]["Position"].fillna("GW")
+
+            game_stats[team_name] = pd.concat([game_stats[team_name], player_stat_dtf], ignore_index=False)
+            try:
+                game_stats[team_name]["Position"] = game_stats[team_name]["Position"].fillna("GW")
+            except KeyError:
+                pass
         head_index += 1
     return game_stats
 

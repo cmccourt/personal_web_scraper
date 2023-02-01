@@ -1,4 +1,5 @@
 import dataclasses
+import traceback
 from datetime import datetime
 from enum import Enum
 from typing import Callable
@@ -6,7 +7,7 @@ from typing import Callable
 from src.data_handlers.eihl_mysql import EIHLMysqlHandler
 # from src.data_handlers.eihl_postgres import EIHLPostgresHandler
 from src.match import insert_all_eihl_matches_to_db
-from src.player_stats import insert_all_players_stats, insert_all_players_stats_concurrently
+from src.player_stats import insert_all_players_stats_concurrently
 from src.team_stats import update_match_team_stats
 
 # TODO make builder function to get data source handler
@@ -49,7 +50,7 @@ def get_data_range() -> tuple[datetime, datetime]:
 # TODO Add option for updating championships
 class Options(Enum):
     UPDATE_PLAYER_MATCH_STATS = CMDOption("Update player's stats for a particular match",
-                                          insert_all_players_stats, ds_handler())
+                                          insert_all_players_stats_concurrently, ds_handler)
     UPDATE_TEAM_MATCH_STATS = CMDOption("Update team's stats for a particular match", update_match_team_stats)
     # UPDATE_CHAMPIONSHIPS = CMDOption("Update team's stats for a particular match", update_match_team_stats)
     UPDATE_MATCH_SCORES = CMDOption("Update DB with the latest EIHL matches", insert_all_eihl_matches_to_db,
@@ -64,17 +65,16 @@ def main():
     """Main function that takes the user's input in the while loop
        and performs the function specified"""
 
-    insert_all_players_stats_concurrently(ds_handler)
-    # is_exit = False
-    # while not is_exit:
-    #     user_input = input("What would you like to do? ->")
-    #     if user_input is None:
-    #         continue
-    #     try:
-    #         Options[user_input].value.action(Options[user_input].value.params)
-    #     except KeyError:
-    #         traceback.print_exc()
-    #         print("This is an invalid option!")
+    is_exit = False
+    while not is_exit:
+        user_input = input("What would you like to do? ->")
+        if user_input is None:
+            continue
+        try:
+            Options[user_input].value.action(Options[user_input].value.params)
+        except KeyError:
+            traceback.print_exc()
+            print("This is an invalid option!")
 
 
 if __name__ == "__main__":
