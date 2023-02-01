@@ -212,9 +212,11 @@ def get_match_player_stats(url: str) -> defaultdict[pd.DataFrame]:
         if isinstance(table_tag, bs4.Tag):
             try:
                 player_stat_dtf = pd.read_html(str(table_tag))[0]
+
             except ValueError:
                 print(f"ERROR No tables found for: {table_tag}")
         game_stats[team_name] = pd.concat([game_stats[team_name], player_stat_dtf], ignore_index=False)
+        game_stats[team_name]["Position"] = game_stats[team_name]["Position"].fillna("GW")
         head_index += 1
     return game_stats
 
@@ -253,7 +255,7 @@ def get_eihl_match_url(match_id: int, base_url: str = eihl_match_url) -> str:
     return match_url
 
 
-def get_match_stats(match_stats_url):
+def extract_match_stats(match_stats_url):
     print(f"\nNext match is {match_stats_url}\n")
     match_stats = get_match_player_stats(match_stats_url)
     # Check if the team score table came through
