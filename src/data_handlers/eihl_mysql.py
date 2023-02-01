@@ -2,13 +2,23 @@ import traceback
 
 from mysql.connector import connect, connection
 
-from settings.settings import MySQLDBConfig
+from settings.settings import mysql_db_config
 
 
 def generate_and_where_clause(params):
-    return " AND ".join([f"{k}=%({k})s" for k, v in params.items()])
+    return " AND ".join([f"{k}=%({k})s" if v is not None else f"{k} IS %({k})s" for k, v in params.items()])
 
 
+# class MySQLConnectionPool:
+#     cnxpool = None
+#
+#     def __init__(self, pool_size=5, db_config:dict = MySQLDBConfig, pool_name="MySQLPool"):
+#         cnxpool = pooling.MySQLConnectionPool(pool_name=pool_name,
+#                                               pool_size=pool_size,
+#                                               **db_config)
+
+
+# TODO Create connection Pool for multiple connections
 class EIHLMysqlHandler:
     match_player_stats_cols = {
         "Jersey": "jersey",
@@ -34,15 +44,12 @@ class EIHLMysqlHandler:
         "SVS%": "save_percentage"
     }
 
-    def __init__(self, db_conn: connection = None):
+    def __init__(self, db_conn: connection = None, db_config=None):
+        if db_config is None:
+            db_config = mysql_db_config
         self.db_conn: connection = db_conn
         if not self.db_conn:
-            self.db_conn = connect(pool_size=1,
-                                   user=MySQLDBConfig.un,
-                                   password=MySQLDBConfig.pw,
-                                   host=MySQLDBConfig.hostname,
-                                   port=MySQLDBConfig.port,
-                                   database=MySQLDBConfig.db)
+            self.db_conn = connect(**db_config)
 
     def shut_down(self):
         if self.db_conn:
@@ -79,7 +86,8 @@ class EIHLMysqlHandler:
             except Exception:
                 self.db_conn.rollback()
                 traceback.print_exc()
-                self.print_sql_query(query, params)
+                print(f"Query -> {query} \n Params -> {params}")
+                # self.print_sql_query(query, params)
             else:
                 self.db_conn.commit()
 
@@ -93,7 +101,6 @@ class EIHLMysqlHandler:
         try:
             # print(db_cur.mogrify(query, player_match_stats))
             self.execute_query(query, new_val_dict)
-            # db_cur.execute(query, player_match_stats)
         except TypeError:
             traceback.print_exc()
 

@@ -1,29 +1,11 @@
 import traceback
 from datetime import datetime
 from pprint import pprint
-from queue import Queue
-from threading import Thread
 
 # TODO Create Protocol for DB handler
 from src.data_handlers.eihl_mysql import EIHLMysqlHandler
 from src.web_scraping.eihl_website_scraping import get_matches, get_gamecentre_month_id, \
-    get_gamecentre_team_id, get_gamecentre_url, extract_match_info, get_eihl_championship_options
-
-
-class MatchInfoExtractor(Thread):
-
-    def __init__(self, queue: Queue, db_handler):
-        Thread.__init__(self)
-        self.queue = queue
-        self.db_handler = db_handler
-
-    def run(self):
-        while True:
-            match_tag, match_date = self.queue.get()
-            try:
-                extract_match_info(match_tag, match_date)
-            finally:
-                self.queue.task_done()
+    get_gamecentre_team_id, get_gamecentre_url, get_eihl_championship_options
 
 
 # TODO Create team season ID table in DB to hold team ID for each season
@@ -34,6 +16,10 @@ def get_db_season_ids(db_handler: EIHLMysqlHandler, seasons: list[str] = None):
         # get all EIHL season ids to iterate through
         season_ids = db_handler.fetch_all_data("SELECT eihl_web_id FROM championship")
     return season_ids
+
+
+def get_match_stats():
+    pass
 
 
 def insert_match_to_db(db_handler: EIHLMysqlHandler, match: dict):
@@ -67,9 +53,19 @@ def insert_championship_to_db(data_source_hdlr: EIHLMysqlHandler, *championships
 
 def get_db_matches(db_handler: EIHLMysqlHandler, teams: list[str] = None,
                    start_date: datetime = None, end_date: datetime = None):
-    return db_handler.fetch_all_data("SELECT * FROM match WHERE match_date BETWEEN %(start_date)s "
-                                     "AND %(end_date)s AND (home_team IN %(teams)s OR away_team IN %(teams)s)",
-                                     {"teams": teams, "start_date": start_date, "end_date": end_date})
+    if not start_date:
+        start_date = datetime.min
+    if not end_date:
+        end_date = datetime.max
+    if not teams:
+        matches = db_handler.fetch_all_data("SELECT * FROM `match` WHERE match_date BETWEEN %(start_date)s "
+                                            "AND %(end_date)s",
+                                            {"start_date": start_date, "end_date": end_date})
+    else:
+        matches = db_handler.fetch_all_data("SELECT * FROM `match` WHERE match_date BETWEEN %(start_date)s "
+                                            "AND %(end_date)s AND (home_team IN %(teams)s OR away_team IN %(teams)s)",
+                                            {"teams": teams, "start_date": start_date, "end_date": end_date})
+    return matches
 
 
 def insert_all_eihl_matches_to_db(db_handler, num_threads=4):
@@ -79,14 +75,8 @@ def insert_all_eihl_matches_to_db(db_handler, num_threads=4):
     if seasons is None or len(seasons) == 0:
         seasons = get_eihl_championship_options()
         insert_championship_to_db(db_handler, *seasons)
-    # queue = Queue()
-    try:
-        #     for x in range(num_threads):
-        #         worker = MatchInfoExtractor(queue, db_handler)
-        #         # Setting daemon to True will let the main thread exit even though the workers are blocking
-        #         worker.daemon = True
-        #         worker.start()
 
+    try:
         for season in seasons:
             season_id = season["eihl_web_id"]
             season_gamecentre_url = get_gamecentre_url(gc_team_id, gc_month_id, season_id)

@@ -3,7 +3,7 @@ import traceback
 import psycopg2
 from psycopg2 import sql, extras, pool
 
-from settings.settings import EIHLStatsDBConfig
+from settings.settings import postgres_db_config
 
 
 # TODO use builder pattern to include OR statements
@@ -11,12 +11,14 @@ def generate_and_where_clause(params):
     return sql.SQL(" AND ").join(sql.Composed([sql.Composed([sql.Identifier(k),
                                                              sql.SQL("="), sql.Placeholder(k)]) for k, v in
                                                params.items()]))
+
+
 class PostgresDBPool:
-    db_conn_pool = pool.ThreadedConnectionPool(1, 20, user=EIHLStatsDBConfig.un,
-                                               password=EIHLStatsDBConfig.pw,
-                                               host=EIHLStatsDBConfig.hostname,
+    db_conn_pool = pool.ThreadedConnectionPool(1, 20, user=postgres_db_config.un,
+                                               password=postgres_db_config.pw,
+                                               host=postgres_db_config.hostname,
                                                port="5432",
-                                               database=EIHLStatsDBConfig.db)
+                                               database=postgres_db_config.db)
 
     def __init__(self):
         print("Create Postgres DB object")

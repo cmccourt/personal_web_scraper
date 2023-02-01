@@ -1,28 +1,22 @@
-from dataclasses import dataclass
+postgres_db_config = {
+    "un": "eihlstats",
+    "pw": "20?6Lo5weLL",
+    "db": "eihlstats",
+    "hostname": "localhost",
+    "port": "5432"}
 
-
-@dataclass
-class EIHLStatsDBConfig:
-    hostname = "localhost"
-    un = "eihlstats"
-    pw = "20?6Lo5weLL"
-    db = "eihlstats"
-
-
-@dataclass
-class MySQLDBConfig:
-    hostname = "localhost"
-    un = "root"
-    pw = "@6Lo5weLL"
-    db = "eihlstats"
-    port = "3306"
+mysql_db_config = {
+    "user": "root",
+    "password": "@6Lo5weLL",
+    "database": "eihlstats",
+    "host": "localhost",
+    "port": "3306"}
 
 # TODO create team URLs here
 eihl_base_url = "https://www.eliteleague.co.uk/"
 eihl_team_url = f"{eihl_base_url}team/"
 eihl_schedule_url = f"{eihl_base_url}schedule/"
 eihl_match_url = f"{eihl_base_url}game/"
-
 
 match_team_stats_cols = {
     "Shots": "shots",
