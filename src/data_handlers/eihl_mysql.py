@@ -1,4 +1,5 @@
 import traceback
+from typing import Any, Sequence
 
 from mysql.connector import connect, connection
 
@@ -9,16 +10,6 @@ def generate_and_where_clause(params):
     return " AND ".join([f"{k}=%({k})s" if v is not None else f"{k} IS %({k})s" for k, v in params.items()])
 
 
-# class MySQLConnectionPool:
-#     cnxpool = None
-#
-#     def __init__(self, pool_size=5, db_config:dict = MySQLDBConfig, pool_name="MySQLPool"):
-#         cnxpool = pooling.MySQLConnectionPool(pool_name=pool_name,
-#                                               pool_size=pool_size,
-#                                               **db_config)
-
-
-# TODO Create connection Pool for multiple connections
 class EIHLMysqlHandler:
     match_player_stats_cols = {
         "Jersey": "jersey",
@@ -42,6 +33,18 @@ class EIHLMysqlHandler:
         "GA": "goals_against",
         "MIN": "mins_played",
         "SVS%": "save_percentage"
+    }
+    match_team_stats_cols = {
+        "Shots": "shots",
+        "Shots on goal": "shots_on_goal",
+        "Shots efficiency": "shot_efficiency",
+        "Power plays": "power_plays",
+        "Power play efficiency": "power_play_efficiency",
+        "Penalty minutes": "penalty_minutes",
+        "Penalty kill efficiency": "penalty_kill_efficiency",
+        "Saves": "saves",
+        "Save percentage": "save_percentage",
+        "Faceoffs won": "faceoffs_won"
     }
 
     def __init__(self, db_conn: connection = None, db_config=None):
@@ -120,17 +123,17 @@ class EIHLMysqlHandler:
         except TypeError:
             traceback.print_exc()
 
-    def check_for_dups(self, params: dict = None, query=None, table: str = None, where_clause: str = None) -> bool:
+    def get_dup_records(self, params: dict = None, query=None, table: str = None,
+                        where_clause: str = None) -> Sequence[Any]:
         records = []
         if where_clause is None:
             where_clause = generate_and_where_clause(params)
         if query is not None:
             records = self.fetch_all_data(query)
         else:
-            # test = self.as_string(where_clause)
             dup_match_sql = "SELECT * FROM {} WHERE {}".format(
                 f"`{table}`" if table[0] != "`" and table[len(table) - 1] != "`" else table,
                 where_clause
             )
             records = self.fetch_all_data(dup_match_sql, params)
-        return True if len(records) > 0 else False
+        return records

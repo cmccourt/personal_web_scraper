@@ -59,7 +59,7 @@ def insert_player_match_stats(db_handler: EIHLMysqlHandler, *player_match_stats:
                         for k, v in player_stats.items()}
 
         try:
-            if not db_handler.check_for_dups(params=player_stats, table="match_player_stats"):
+            if len(db_handler.get_dup_records(params=player_stats, table="match_player_stats")) == 0:
                 print(f"Match ID: {match_id}, team: {team_name}, player {player_name} stats to be inserted!")
                 db_handler.insert_data("match_player_stats", player_stats)
             else:
@@ -99,7 +99,7 @@ def insert_all_players_stats(db_handler: EIHLMysqlHandler):
         print("Player match stats insertion Successful!!!")
 
 
-def insert_all_players_stats_concurrently(db_obj_func: Callable, matches: list[dict] = None, num_threads=10):
+def insert_all_players_stats_concurrently(db_obj_func: Callable, matches: list[dict] = None, num_threads=5):
     db_handler = db_obj_func()
     if matches is None or len(matches) == 0:
         matches = get_db_matches(db_handler, end_date=datetime.now())
@@ -107,6 +107,7 @@ def insert_all_players_stats_concurrently(db_obj_func: Callable, matches: list[d
     matches_queue = Queue()
     player_stats_producer(matches_queue, matches)
     consumers = [Thread(target=player_stats_consumer, args=(matches_queue, db_obj_func,)) for i in range(num_threads)]
+    # TODO implement logging
     try:
         for consumer in consumers:
             # Setting daemon to True will let the main thread exit even though the workers are blocking

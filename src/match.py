@@ -18,32 +18,34 @@ def get_db_season_ids(db_handler: EIHLMysqlHandler, seasons: list[str] = None):
     return season_ids
 
 
-def get_match_stats():
-    pass
-
-
-def insert_match_to_db(db_handler: EIHLMysqlHandler, match: dict):
+def insert_match_to_db(db_handler: EIHLMysqlHandler, match: dict, update_exist_matches=False):
     try:
-        contains_dups = db_handler.check_for_dups(params=match, table="match")
-        if contains_dups:
-            # Find duplicates using datetime home team and away team only
-            # Change where clause in case there is dup matches
-            # TODO SQL INJECTION ALERT!
-            where_clause = "match_date=%(match_date)s AND home_team=%(home_team)s AND away_team=%(away_team)s"
-            contains_dups = db_handler.check_for_dups(params=match, table="match", where_clause=where_clause)
-
-        if not contains_dups:
+        # TODO Is there potential for SQL injection?
+        where_clause = "match_date=%(match_date)s AND home_team=%(home_team)s AND away_team=%(away_team)s"
+        dup_records = db_handler.get_dup_records(params=match, table="match", where_clause=where_clause)
+        if len(dup_records) > 1:
+            # TODO Implement logging for this scenario
+            print(f"More than 1 duplicate for match: {match}")
+        elif len(dup_records) == 0:
             db_handler.insert_data("match", match)
+        elif update_exist_matches and \
+                (dup_records[0].get("home_score", None) is None or dup_records[0].get("away_score", None) is None):
+            db_handler.update_data("match", match, where_clause)
         else:
-            print("Match already exists in DB")
+            print(f"Not overwriting existing match: {match}")
     except Exception:
         traceback.print_exc()
+
+
+def insert_all_eihl_championships(db_handler: EIHLMysqlHandler):
+    seasons = get_eihl_championship_options()
+    insert_championship_to_db(db_handler, *seasons)
 
 
 def insert_championship_to_db(data_source_hdlr: EIHLMysqlHandler, *championships: dict):
     for champ in championships:
         try:
-            if not data_source_hdlr.check_for_dups(params=champ, table="championship"):
+            if len(data_source_hdlr.get_dup_records(params=champ, table="championship")) == 0:
                 data_source_hdlr.insert_data("championship", champ)
         except Exception:
             traceback.print_exc()
@@ -68,7 +70,7 @@ def get_db_matches(db_handler: EIHLMysqlHandler, teams: list[str] = None,
     return matches
 
 
-def insert_all_eihl_matches_to_db(db_handler, num_threads=4):
+def update_all_eihl_matches_to_db(db_handler, overwrite_exist_matches=False, num_threads=4):
     gc_team_id = get_gamecentre_team_id()
     gc_month_id = get_gamecentre_month_id()
     seasons = get_db_season_ids(db_handler)
@@ -85,6 +87,6 @@ def insert_all_eihl_matches_to_db(db_handler, num_threads=4):
                 pprint(match)
                 # TODO should the data storage class handle column name conversions?
                 match.update({"championship_id": season_id})
-                insert_match_to_db(db_handler, match)
+                insert_match_to_db(db_handler, match, overwrite_exist_matches)
     except Exception:
         traceback.print_exc()
