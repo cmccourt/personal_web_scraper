@@ -30,13 +30,13 @@ def extract_team_match_stats(match_html: str) -> dict:
         stat_list = list(stats_html.get_text("|", strip=True).split("|"))
         if stat_list[0].lower() == "team stats":
             del stat_list[0]
-        get_stats_from_list(away_team_stats, home_team_stats, stat_float_regex, stat_list)
+        get_team_stats_from_list(away_team_stats, home_team_stats, stat_float_regex, stat_list)
 
     match_team_stats = {"home_team": home_team_stats, "away_team": away_team_stats}
     return match_team_stats
 
 
-def get_stats_from_list(away_team_stats, home_team_stats, stat_float_regex, stat_list):
+def get_team_stats_from_list(away_team_stats, home_team_stats, stat_float_regex, stat_list):
     def assign_stat_to_team(header, team_stats, stats=None, stat_index=None, value=None):
         if stats is not None and stat_index is not None:
             try:
