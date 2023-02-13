@@ -9,7 +9,7 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
-from settings.settings import eihl_schedule_url, match_team_stats_cols, eihl_match_url
+from settings.settings import eihl_schedule_url, eihl_match_url
 from src.utils import get_date_format, extract_float_from_str, get_html_content
 
 
@@ -23,45 +23,49 @@ def extract_team_match_stats(match_html: str) -> dict:
 
     html_container = match_html_content.findAll('div', attrs={'class': 'container'})[0]
     stats_html: bs4.Tag = html_container.find("div")
-    test = stats_html.find("h2")
-    if "TEAM STATS" in test.get_text().upper():
-        stat_text = list(stats_html.get_text("|", strip=True).split("|"))
-        if stat_text[0].lower() == "team stats":
-            del stat_text[0]
-        # We go backwards in the loop as the stat titles are below the numbers
-        i = len(stat_text) - 1
-        while i is not None:
-            if i < 0:
-                break
-            stat = stat_text[i]
-            if not any(char.isdigit() for char in stat):
-                # TODO replace dependency to db columns
-                db_col = match_team_stats_cols.get(stat_text[i], stat_text[i])
-                # As we're going backwards the away stats will be before the home stats
-                if match_team_stats_cols.get(stat_text[i - 1], None) is not None or \
-                        match_team_stats_cols.get(stat_text[i - 2], None) is not None:
-                    home_stat = 0.0
-                    away_stat = 0.0
-                    # Only go one level down to get next stat
-                    i -= 1
-                else:
-                    away_stat = extract_float_from_str(stat_text[i - 1])
-                    if away_stat is None or away_stat == "":
-                        away_stat = 0.0
-
-                    home_stat = extract_float_from_str(stat_text[i - 2])
-                    if home_stat is None or home_stat == "":
-                        home_stat = 0.0
-                    # Go to next stat
-                    i -= 3
-                away_team_stats[db_col] = away_stat
-                home_team_stats[db_col] = home_stat
-            else:
-                # Move to next stat
-                i -= 1
+    # E.g. of values that match Regex: 20, 20.0, 20%, 20.06%
+    stat_float_regex = r"(\d+(\.\d+)?%)|(\d+(\.\d+))|(\d+)"
+    if "TEAM STATS" in stats_html.find("h2").get_text().upper():
+        # Found the team stats section
+        stat_list = list(stats_html.get_text("|", strip=True).split("|"))
+        if stat_list[0].lower() == "team stats":
+            del stat_list[0]
+        get_stats_from_list(away_team_stats, home_team_stats, stat_float_regex, stat_list)
 
     match_team_stats = {"home_team": home_team_stats, "away_team": away_team_stats}
     return match_team_stats
+
+
+def get_stats_from_list(away_team_stats, home_team_stats, stat_float_regex, stat_list):
+    def assign_stat_to_team(header, team_stats, stats=None, stat_index=None, value=None):
+        if stats is not None and stat_index is not None:
+            try:
+                value = stats[stat_index]
+            except IndexError:
+                value = None
+        team_stats[header] = extract_float_from_str(value) or 0.0
+
+    stat_list_len = len(stat_list)
+    i = 0
+    stat_header = None
+    while i < stat_list_len:
+        stat_value = stat_list[i]
+        if not re.findall(stat_float_regex, stat_value):
+            stat_header = stat_value
+            # Add stats for category
+            assign_stat_to_team(stat_value, home_team_stats, stat_list, i + 1)
+            assign_stat_to_team(stat_value, away_team_stats, stat_list, i + 2)
+        elif stat_header is None:
+            # find the category this number belongs too
+            next_header_index = next((j for j in range(i, stat_list_len)
+                                      if not re.findall(stat_float_regex, stat_list[j])))
+            stat_header = stat_list[next_header_index]
+            assign_stat_to_team(stat_header, home_team_stats, value=stat_value)
+            assign_stat_to_team(stat_header, away_team_stats, stat_list, i + 1)
+            i = next_header_index + 1
+            stat_header = None
+            continue
+        i += 1
 
 
 def get_eihl_championship_options(schedule_url: str = eihl_schedule_url):
