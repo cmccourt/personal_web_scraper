@@ -13,12 +13,12 @@ def get_date_format(text: str, fmt: str) -> datetime or None:
         return None
 
 
-def extract_float_from_str(str_value: str):
+def extract_float_from_str(str_value: str, float_regex=r"(\d+.\d+)(?=%)"):
     if not isinstance(str_value, str):
         return None
 
-    if re.findall(r"(\d+.\d+)(?=%)", str_value):
-        float_value = re.search(r"(\d+.\d+)(?=%)", str_value).group(1)
+    if re.findall(float_regex, str_value):
+        float_value = re.search(float_regex, str_value).group(1)
     else:
         float_value = str_value
 

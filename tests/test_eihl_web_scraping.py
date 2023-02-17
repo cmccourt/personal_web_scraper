@@ -1,6 +1,7 @@
 import pytest
 
-from src.web_scraping.eihl_website_scraping import extract_team_match_stats
+from settings.settings import eihl_schedule_url
+from src.web_scraping.eihl_website_scraping import extract_team_match_stats, get_eihl_championship_options
 
 
 @pytest.mark.parametrize("match_url,expected",
@@ -40,3 +41,19 @@ def test_extract_team_match_stats(match_url, expected):
         if stats != expected[team]:
             pytest.fail(f"expected result: {expected[team]} \n"
                         f"Actual result: {stats}")
+
+
+def test_get_eihl_championship_options():
+    url = eihl_schedule_url
+    try:
+        champ_options = get_eihl_championship_options(url)
+    except Exception:
+        pytest.fail()
+
+
+def test_get_eihl_web_match_id():
+    pass
+
+
+def test_get_match_player_stats():
+    pass

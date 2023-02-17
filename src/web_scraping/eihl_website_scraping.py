@@ -86,23 +86,23 @@ def get_eihl_championship_options(schedule_url: str = eihl_schedule_url):
     return champ_list
 
 
-def get_eihl_web_match_id(match_row_html) -> int or None:
+def get_eihl_web_match_id(match_row_html: bs4.Tag) -> int or None:
     a_tag = match_row_html.find("a")
-    game_web_id = re.findall(r"(?<=/game/).*$", a_tag.get('href', None))[0]
     try:
-        if game_web_id:
-            return game_web_id
+        game_web_id = re.findall(r"(?<=/game/).*$", a_tag.get('href', None))[0]
+        return game_web_id
     except Exception:
         print(f"{game_web_id} is not a valid number")
         traceback.print_exc()
     return None
 
 
-def get_match_html_tags(url: str) -> list[(bs4.Tag, datetime.date)]:
-    res_beaus = get_html_content(url)
+def get_match_html_tags(url: str, html_content: BeautifulSoup = None) -> list[(bs4.Tag, datetime.date)]:
+    if html_content is None:
+        res_beaus = get_html_content(url)
 
-    html_content = res_beaus.find("body").find("main").find(class_="wrapper")
-    html_content = html_content.find(class_="container-fluid text-center text-md-left")
+        html_content = res_beaus.find("body").find("main").find(class_="wrapper")
+        html_content = html_content.find(class_="container-fluid text-center text-md-left")
 
     matches = []
     match_date = None
@@ -117,11 +117,12 @@ def get_match_html_tags(url: str) -> list[(bs4.Tag, datetime.date)]:
     return matches
 
 
-def get_matches(url: str, filt: Callable[[str], bool] = lambda x: True):
-    res_beaus = get_html_content(url)
+def get_matches(url: str, html_content: BeautifulSoup = None, filt: Callable[[str], bool] = lambda x: True):
+    if html_content is None:
+        res_beaus = get_html_content(url)
 
-    html_content = res_beaus.find("body").find("main").find(class_="wrapper")
-    html_content = html_content.find(class_="container-fluid text-center text-md-left")
+        html_content = res_beaus.find("body").find("main").find(class_="wrapper")
+        html_content = html_content.find(class_="container-fluid text-center text-md-left")
 
     matches = []
     match_date = None
