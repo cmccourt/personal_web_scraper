@@ -133,23 +133,28 @@ def get_matches(url: str, html_content: BeautifulSoup = None, filt: Callable[[st
             match_date = game_date
 
         if tag.name == "div" and len(tag.find_all()) > 0:
-            match_info = extract_match_info(tag, match_date)
+            match_info = extract_match_info_from_tag(tag)
+            match_info["match_date"] = match_date
+            try:
+                match_info["match_date"] = datetime.combine(match_date, match_info.pop("match_time"))
+            except (AttributeError, TypeError, KeyError):
+                # no time present. Created dummy placeholder
+                match_info["match_date"] = match_date
             matches.append(match_info)
     return matches
 
 
-def extract_match_info(tag, match_date=None):
+def extract_match_info_from_tag(tag) -> dict:
     match_info = defaultdict()
     match_info["eihl_web_match_id"] = get_eihl_web_match_id(tag)
     match_details = [r.text.strip() for r in tag.contents]
     match_details = [x for x in match_details if x.lower() not in ("", "details")]
 
-    match_info["match_date"] = match_date
     try:
-        match_time = get_date_format(match_details[0], "%H:%M").time()
-        match_info["match_date"] = datetime.combine(match_date, match_time)
+        match_info["match_time"] = get_date_format(match_details[0], "%H:%M").time()
     except AttributeError:
         # no time present. Created dummy placeholder
+        match_info["match_time"] = None
         match_details.insert(0, None)
 
     # EIHL website for older seasons have game numbers or match type between time and home team

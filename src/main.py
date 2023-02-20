@@ -1,7 +1,7 @@
 import dataclasses
 from datetime import datetime
 from enum import Enum
-from typing import Callable
+from typing import Callable, Tuple
 
 from src.data_handlers.eihl_mysql import EIHLMysqlHandler
 # from src.data_handlers.eihl_postgres import EIHLPostgresHandler
@@ -18,7 +18,7 @@ db_handler = EIHLMysqlHandler
 class CMDOption:
     help: str or None
     action: Callable
-    params: object or None = None
+    params: Tuple or None = None
 
 
 def display_help():
@@ -49,12 +49,13 @@ def get_data_range() -> tuple[datetime, datetime]:
 
 class Options(Enum):
     UPDATE_PLAYER_MATCH_STATS = CMDOption("Update player's stats for a particular match",
-                                          insert_all_players_stats_concurrently, db_handler)
+                                          insert_all_players_stats_concurrently, (db_handler,))
     UPDATE_TEAM_MATCH_STATS = CMDOption("Update team's stats for a particular match", update_match_team_stats,
-                                        db_handler)
-    UPDATE_CHAMPIONSHIPS = CMDOption("Update EIHL championships in the DB", insert_all_eihl_championships, db_handler())
+                                        (db_handler,))
+    UPDATE_CHAMPIONSHIPS = CMDOption("Update EIHL championships in the DB", insert_all_eihl_championships,
+                                     (db_handler(),))
     UPDATE_MATCH_SCORES = CMDOption("Update DB with the latest EIHL matches", update_all_eihl_matches_to_db,
-                                    db_handler())
+                                    (db_handler(), True))
     CHANGE_WEBSITE = CMDOption("Change Data Source", lambda x: "This will be implemented in the future")
     CHANGE_DATABASE = CMDOption("Change Database", lambda x: "This will be implemented in the future")
     HELP = CMDOption("You know what this function works you eejit!", display_help)
@@ -71,7 +72,10 @@ def main():
         if user_input is None:
             continue
         try:
-            Options[user_input].value.action(Options[user_input].value.params)
+            if Options[user_input].value.params:
+                Options[user_input].value.action(*Options[user_input].value.params)
+            else:
+                Options[user_input].value.action()
         except KeyError:
             print("This is an invalid option!")
 
