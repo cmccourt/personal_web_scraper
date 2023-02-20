@@ -5,7 +5,7 @@ from pprint import pprint
 # TODO Create Protocol for DB handler
 from src.data_handlers.eihl_mysql import EIHLMysqlHandler
 from src.web_scraping.eihl_website_scraping import get_matches, get_gamecentre_month_id, \
-    get_gamecentre_team_id, get_gamecentre_url, get_eihl_championship_options
+    get_gamecentre_team_id, get_gamecentre_url, get_eihl_championship_options, get_start_end_dates_from_gamecentre
 
 
 # TODO Create team season ID table in DB to hold team ID for each season
@@ -53,6 +53,21 @@ def insert_championship_to_db(data_source_hdlr: EIHLMysqlHandler, *championships
             print("Championship has been inserted!")
 
 
+def refresh_championships(db_handler: EIHLMysqlHandler):
+    db_champs = db_handler.fetch_all_data(table="championship", cols="eihl_web_id, name")
+    eihl_web_champs = get_eihl_championship_options()
+    if eihl_web_champs == db_champs:
+        print(f"All championship options are stored in the database")
+    else:
+        champ_diff = [x for x in eihl_web_champs if x not in db_champs]
+        for champ in champ_diff:
+            champ_schedule_url = get_gamecentre_url(season_id=champ.get("eihl_web_id", None))
+            start_dt, end_dt = get_start_end_dates_from_gamecentre(champ_schedule_url)
+            champ["start_date"] = start_dt
+            champ["end_date"] = end_dt
+        insert_championship_to_db(db_handler, *champ_diff)
+
+
 def get_db_matches(db_handler: EIHLMysqlHandler, teams: list[str] = None,
                    start_date: datetime = None, end_date: datetime = None):
     if not start_date:
@@ -81,7 +96,7 @@ def update_all_eihl_matches_to_db(db_handler, overwrite_exist_matches=False, num
     try:
         for season in seasons:
             season_id = season["eihl_web_id"]
-            season_gamecentre_url = get_gamecentre_url(gc_team_id, gc_month_id, season_id)
+            season_gamecentre_url = get_gamecentre_url(season_id, gc_team_id, gc_month_id)
             season_matches = get_matches(season_gamecentre_url)
             for match in season_matches:
                 pprint(match)

@@ -73,9 +73,15 @@ class EIHLMysqlHandler:
         else:
             print("ERROR unable to print SQL! No DB connection available!\n")
 
-    def fetch_all_data(self, query, params=None):
+    def fetch_all_data(self, query: str = None, params: dict = None,
+                       table: str = None, cols: str = None):
         try:
             with self.db_conn.cursor(dictionary=True) as db_cur:
+                if table is not None:
+                    query = "SELECT {} FROM {}".format(cols if cols else "*",
+                                                       f"`{table}`" if table[0] != "`" and table[len(table) - 1] != "`"
+                                                       else table
+                                                       )
                 db_cur.execute(query, params)
                 result = db_cur.fetchall()
                 return result

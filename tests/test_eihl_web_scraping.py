@@ -1,7 +1,10 @@
+from datetime import datetime
+
 import pytest
 
 from settings.settings import eihl_schedule_url
-from src.web_scraping.eihl_website_scraping import extract_team_match_stats, get_eihl_championship_options
+from src.web_scraping.eihl_website_scraping import extract_team_match_stats, get_eihl_championship_options, \
+    get_start_end_dates_from_gamecentre
 
 
 @pytest.mark.parametrize("match_url,expected",
@@ -41,6 +44,22 @@ def test_extract_team_match_stats(match_url, expected):
         if stats != expected[team]:
             pytest.fail(f"expected result: {expected[team]} \n"
                         f"Actual result: {stats}")
+
+
+@pytest.mark.parametrize("test_url,expected_start,expected_end",
+                         [("https://www.eliteleague.co.uk/schedule?id_season=36&id_team=0&id_month=999",
+                           datetime(2022, 9, 10), datetime(2023, 4, 2)),
+                          ("https://www.eliteleague.co.uk/schedule?id_season=22&id_team=0&id_month=999",
+                           datetime(2003, 9, 12), datetime(2004, 3, 14)),
+                          ("https://www.eliteleague.co.uk/schedule?id_season=10&id_team=0&id_month=999",
+                           datetime(2017, 9, 2), datetime(2018, 3, 4))
+                          ])
+def test_get_start_end_dates_from_gamecentre(test_url, expected_start, expected_end):
+    try:
+        start_date, end_date = get_start_end_dates_from_gamecentre(test_url)
+        assert start_date == expected_start and end_date == expected_end
+    except Exception:
+        pytest.fail()
 
 
 def test_get_eihl_championship_options():

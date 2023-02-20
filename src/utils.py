@@ -5,6 +5,21 @@ import requests
 from bs4 import BeautifulSoup
 
 
+def get_start_end_dates_from_str_list(text: list or tuple):
+    start_date = None
+    end_date = None
+    for dt_regex, dt_fmt in ((r"([0-9]{2}/[0-9]{2}/[0-9]{4})", '%d/%m/%Y'),
+                             (r"([0-9]{2}\.[0-9]{2}\.[0-9]{4})", '%d.%m.%Y')):
+        dates = re.findall(dt_regex, text)
+        try:
+            dates = sorted([datetime.strptime(x, dt_fmt) for x in dates])
+            start_date = dates[0]
+            end_date = dates[-1]
+        except IndexError:
+            continue
+    return start_date, end_date
+
+
 def get_date_format(text: str, fmt: str) -> datetime or None:
     try:
         text_dt = datetime.strptime(text, fmt)

@@ -10,7 +10,37 @@ import requests
 from bs4 import BeautifulSoup
 
 from settings.settings import eihl_schedule_url, eihl_match_url
-from src.utils import get_date_format, extract_float_from_str, get_html_content
+from src.utils import get_date_format, extract_float_from_str, get_html_content, get_start_end_dates_from_str_list
+
+
+def get_eihl_championship_options(schedule_url: str = eihl_schedule_url):
+    res_beaus = get_html_content(schedule_url)
+    html_id_season = res_beaus.body.find(id="id_season")
+    champ_list = []
+    id_search = "id_season="
+    for s_id in html_id_season.find_all("option"):
+        champ_id = s_id.get("value")
+        if not champ_id:
+            continue
+        try:
+            champ_id = int(champ_id[champ_id.find(id_search) + len(id_search):])
+            champ_list.append({"eihl_web_id": champ_id, "name": s_id.get_text()})
+        except ValueError:
+            print(traceback.print_exc())
+        print(s_id)
+    return champ_list
+
+
+def get_start_end_dates_from_gamecentre(schedule_url: str) -> tuple[datetime or None, datetime or None]:
+    start_date = None
+    end_date = None
+    # Get container that holds matches
+    res_beaus = get_html_content(schedule_url)
+    html_content = res_beaus.find("body").find("main").find(class_="wrapper")
+    html_content = html_content.find(class_="container-fluid text-center text-md-left")
+    html_text: str = html_content.get_text(separator=",", strip=True)
+    start_date, end_date = get_start_end_dates_from_str_list(html_text)
+    return start_date, end_date
 
 
 def extract_team_match_stats(match_html: str) -> dict:
@@ -66,24 +96,6 @@ def get_team_stats_from_list(away_team_stats, home_team_stats, stat_float_regex,
             stat_header = None
             continue
         i += 1
-
-
-def get_eihl_championship_options(schedule_url: str = eihl_schedule_url):
-    res_beaus = get_html_content(schedule_url)
-    html_id_season = res_beaus.body.find(id="id_season")
-    champ_list = []
-    id_search = "id_season="
-    for s_id in html_id_season.find_all("option"):
-        champ_id = s_id.get("value")
-        if not champ_id:
-            continue
-        try:
-            champ_id = int(champ_id[champ_id.find(id_search) + len(id_search):])
-            champ_list.append({"eihl_web_id": champ_id, "name": s_id.get_text()})
-        except ValueError:
-            print(traceback.print_exc())
-        print(s_id)
-    return champ_list
 
 
 def get_eihl_web_match_id(match_row_html: bs4.Tag) -> int or None:
@@ -258,7 +270,7 @@ def get_gamecentre_team_id(team_name: str = None):
         return team_name
 
 
-def get_gamecentre_url(team_id: int, month_id: int, season_id: int, base_url: str = eihl_schedule_url) -> str:
+def get_gamecentre_url(season_id: int, team_id: int = 0, month_id: int = 999, base_url: str = eihl_schedule_url) -> str:
     season_url = f"{base_url}?id_season={season_id}&id_team={team_id}&id_month={month_id}"
     return season_url
 
