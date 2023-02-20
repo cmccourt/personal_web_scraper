@@ -10,7 +10,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from settings.settings import eihl_schedule_url, eihl_match_url
-from src.utils import get_date_format, extract_float_from_str, get_html_content, get_start_end_dates_from_str_list
+from src.utils import extract_date_from_str, extract_float_from_str, get_html_content, get_start_end_dates_from_str_list
 
 
 def get_eihl_championship_options(schedule_url: str = eihl_schedule_url):
@@ -120,7 +120,7 @@ def get_match_html_tags(url: str, html_content: BeautifulSoup = None) -> list[(b
     match_date = None
     for tag in html_content:
         game_date_text = tag.get_text()
-        game_date = get_date_format(game_date_text, "%A %d.%m.%Y")
+        game_date = extract_date_from_str(game_date_text, "%A %d.%m.%Y")
         if game_date is not None and match_date != game_date_text:
             match_date = game_date
 
@@ -129,21 +129,31 @@ def get_match_html_tags(url: str, html_content: BeautifulSoup = None) -> list[(b
     return matches
 
 
-def get_matches(url: str, html_content: BeautifulSoup = None, filt: Callable[[str], bool] = lambda x: True):
+def get_matches(url: str, html_content: BeautifulSoup = None, start_date: datetime = datetime.min,
+                end_date: datetime = datetime.max, teams: list or tuple = None,
+                filt: Callable[[str], bool] = lambda x: True):
+    if teams is None:
+        teams = []
     if html_content is None:
         res_beaus = get_html_content(url)
 
         html_content = res_beaus.find("body").find("main").find(class_="wrapper")
         html_content = html_content.find(class_="container-fluid text-center text-md-left")
 
+    gamecentre_date_fmt = "%A %d.%m.%Y"
     matches = []
     match_date = None
     for tag in html_content:
-        game_date_text = tag.get_text()
-        game_date = get_date_format(game_date_text, "%A %d.%m.%Y")
-        if game_date is not None and match_date != game_date_text:
-            match_date = game_date
+        tag_text = tag.get_text()
 
+        game_date = extract_date_from_str(tag_text, gamecentre_date_fmt)
+        if game_date is not None and match_date != tag_text:
+            match_date = game_date
+        if match_date is not None:
+            if start_date > match_date or (teams and not [x for x in teams if x.lower() in tag_text.lower()]):
+                continue
+            elif match_date > end_date:
+                break
         if tag.name == "div" and len(tag.find_all()) > 0:
             match_info = extract_match_info_from_tag(tag)
             match_info["match_date"] = match_date
@@ -163,7 +173,7 @@ def extract_match_info_from_tag(tag) -> dict:
     match_details = [x for x in match_details if x.lower() not in ("", "details")]
 
     try:
-        match_info["match_time"] = get_date_format(match_details[0], "%H:%M").time()
+        match_info["match_time"] = extract_date_from_str(match_details[0], "%H:%M").time()
     except AttributeError:
         # no time present. Created dummy placeholder
         match_info["match_time"] = None

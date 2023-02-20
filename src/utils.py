@@ -20,7 +20,7 @@ def get_start_end_dates_from_str_list(text: list or tuple):
     return start_date, end_date
 
 
-def get_date_format(text: str, fmt: str) -> datetime or None:
+def extract_date_from_str(text: str, fmt: str) -> datetime or None:
     try:
         text_dt = datetime.strptime(text, fmt)
         return text_dt
