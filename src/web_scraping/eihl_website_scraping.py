@@ -2,7 +2,6 @@ import re
 import traceback
 from collections import defaultdict
 from datetime import datetime
-from typing import Callable
 
 import bs4
 import pandas as pd
@@ -130,8 +129,7 @@ def get_match_html_tags(url: str, html_content: BeautifulSoup = None) -> list[(b
 
 
 def get_matches(url: str, html_content: BeautifulSoup = None, start_date: datetime = datetime.min,
-                end_date: datetime = datetime.max, teams: list or tuple = None,
-                filt: Callable[[str], bool] = lambda x: True):
+                end_date: datetime = datetime.max, teams: list or tuple = None):
     if teams is None:
         teams = []
     if html_content is None:

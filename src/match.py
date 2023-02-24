@@ -37,11 +37,6 @@ def insert_match_to_db(db_handler: EIHLMysqlHandler, match: dict, update_exist_m
         traceback.print_exc()
 
 
-def insert_all_eihl_championships(db_handler: EIHLMysqlHandler):
-    seasons = get_eihl_championship_options()
-    insert_championship_to_db(db_handler, *seasons)
-
-
 def insert_championship_to_db(data_source_hdlr: EIHLMysqlHandler, *championships: dict):
     for champ in championships:
         try:

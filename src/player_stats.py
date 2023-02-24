@@ -18,38 +18,7 @@ def build_match_stats_url(eihl_web_match_id):
     return match_stats_url
 
 
-def player_stats_producer(stat_queue, matches):
-    try:
-        print("Producer: Running")
-        for match_info in matches:
-            match_stats_url = build_match_stats_url(match_info.get("eihl_web_match_id", ""))
-            stat_queue.put((match_info, match_stats_url))
-
-        print("Producer: Done")
-        # team_stats.apply(insert_team_match_stats, args=(db_cur, db_conn, True), axis=1)
-    except Exception:
-        traceback.print_exc()
-
-
-def player_stats_consumer(stat_queue, db_object_func):
-    print("Consumer: Running")
-    db_handler = db_object_func()
-    while True:
-        match_info, match_url = stat_queue.get(block=True)
-        if match_info is None:
-            break
-        try:
-            all_player_stats = get_player_stats(db_handler, match=match_info, match_stats_url=match_url)
-            for team_player_stats in all_player_stats:
-                insert_player_match_stats(db_handler, *team_player_stats)
-        except Exception:
-            traceback.print_exc()
-        finally:
-            stat_queue.task_done()
-    print('Consumer: Done')
-
-
-def insert_player_match_stats(db_handler: EIHLMysqlHandler, *player_match_stats: dict):
+def insert_player_stats_to_db(db_handler: EIHLMysqlHandler, *player_match_stats: dict):
     for player_stats in player_match_stats:
         team_name = player_stats.get("team_name", None)
         player_name = player_stats.get("player_name", None)
@@ -84,22 +53,38 @@ def get_player_stats(db_handler, match=None, match_stats_url: str = None) -> lis
     return player_stats
 
 
-def insert_all_players_stats(db_handler: EIHLMysqlHandler):
-    matches = get_db_matches(db_handler)
+def player_stats_producer(stat_queue, matches):
     try:
-        for match in matches:
-            match_stats_url = build_match_stats_url(match.get("eihl_web_match_id", ""))
-            all_player_stats = get_player_stats(db_handler, match, match_stats_url)
-            for team_player_stats in all_player_stats:
-                insert_player_match_stats(db_handler, *team_player_stats)
+        print("Producer: Running")
+        for match_info in matches:
+            match_stats_url = build_match_stats_url(match_info.get("eihl_web_match_id", ""))
+            stat_queue.put((match_info, match_stats_url))
+
+        print("Producer: Done")
         # team_stats.apply(insert_team_match_stats, args=(db_cur, db_conn, True), axis=1)
     except Exception:
         traceback.print_exc()
-    else:
-        print("Player match stats insertion Successful!!!")
 
 
-def insert_all_players_stats_concurrently(db_obj_func: Callable, matches: list[dict] = None, num_threads=5):
+def player_stats_consumer(stat_queue, db_object_func):
+    print("Consumer: Running")
+    db_handler = db_object_func()
+    while True:
+        match_info, match_url = stat_queue.get(block=True)
+        if match_info is None:
+            break
+        try:
+            all_player_stats = get_player_stats(db_handler, match=match_info, match_stats_url=match_url)
+            for team_player_stats in all_player_stats:
+                insert_player_stats_to_db(db_handler, *team_player_stats)
+        except Exception:
+            traceback.print_exc()
+        finally:
+            stat_queue.task_done()
+    print('Consumer: Done')
+
+
+def update_players_stats(db_obj_func: Callable, matches: list[dict] = None, num_threads=5):
     db_handler = db_obj_func()
     if matches is None or len(matches) == 0:
         matches = get_db_matches(db_handler, end_date=datetime.now())

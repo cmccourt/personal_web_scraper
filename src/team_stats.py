@@ -59,13 +59,13 @@ def insert_team_match_stats_to_db(db_handler: EIHLMysqlHandler, team_match_stats
         print(f"THERE ARE DUPLICATE records for team stats for match ID {match_id}, team: {team_name}.")
 
 
-def update_match_team_stats(db_obj_func: callable, num_threads=5, *db_matches: dict):
+def update_match_team_stats(db_obj_func: callable, num_threads=5, matches: list[dict] = None):
     db_handler = db_obj_func()
-    if len(db_matches) == 0:
-        db_matches = get_db_matches(db_handler, end_date=datetime.now())
+    if len(matches) == 0:
+        matches = get_db_matches(db_handler, end_date=datetime.now())
 
     matches_queue = Queue()
-    team_stats_producer(matches_queue, db_matches)
+    team_stats_producer(matches_queue, matches)
     consumers = [Thread(target=team_stats_consumer, args=(matches_queue, db_obj_func,)) for i in range(num_threads)]
     # TODO implement logging
     try:

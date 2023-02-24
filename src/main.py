@@ -5,13 +5,13 @@ from typing import Callable, Tuple
 
 from src.data_handlers.eihl_mysql import EIHLMysqlHandler
 # from src.data_handlers.eihl_postgres import EIHLPostgresHandler
-from src.match import update_all_eihl_matches_to_db, insert_all_eihl_championships
-from src.player_stats import insert_all_players_stats_concurrently
+from src.match import update_all_eihl_matches_to_db, refresh_championships
+from src.player_stats import update_players_stats
 from src.team_stats import update_match_team_stats
 
 # TODO make builder function to get data source handler
 # ds_handler = EIHLPostgresHandler()
-db_handler = EIHLMysqlHandler
+db_handler_func = EIHLMysqlHandler
 
 
 @dataclasses.dataclass(init=True)
@@ -47,15 +47,33 @@ def get_data_range() -> tuple[datetime, datetime]:
     return start_date, end_date
 
 
+def refresh_db():
+    db_handler = db_handler_func()
+    refresh_championships(db_handler)
+    update_all_eihl_matches_to_db(db_handler, True)
+    update_match_team_stats(db_handler_func)
+    update_players_stats(db_handler_func)
+
+
+def update_recent():
+    db_handler = db_handler_func()
+    refresh_championships(db_handler)
+    matches = db_handler.fetch_all_data("SELECT * FROM `match` WHERE home_score IS NULL or away_score IS NULL")
+    update_match_team_stats(db_handler_func, matches=matches)
+    update_players_stats(db_handler_func, matches=matches)
+
+
 class Options(Enum):
     UPDATE_PLAYER_MATCH_STATS = CMDOption("Update player's stats for a particular match",
-                                          insert_all_players_stats_concurrently, (db_handler,))
+                                          update_players_stats, (db_handler_func,))
     UPDATE_TEAM_MATCH_STATS = CMDOption("Update team's stats for a particular match", update_match_team_stats,
-                                        (db_handler,))
-    UPDATE_CHAMPIONSHIPS = CMDOption("Update EIHL championships in the DB", insert_all_eihl_championships,
-                                     (db_handler(),))
+                                        (db_handler_func,))
+    UPDATE_CHAMPIONSHIPS = CMDOption("Update EIHL championships in the DB", refresh_championships,
+                                     (db_handler_func(),))
     UPDATE_MATCH_SCORES = CMDOption("Update DB with the latest EIHL matches", update_all_eihl_matches_to_db,
-                                    (db_handler(), True))
+                                    (db_handler_func(), True))
+    REFRESH_DB = CMDOption("Update recent matches and stats", refresh_db)
+    UPDATE_RECENT = CMDOption("Update recent matches and stats", update_recent)
     CHANGE_WEBSITE = CMDOption("Change Data Source", lambda x: "This will be implemented in the future")
     CHANGE_DATABASE = CMDOption("Change Database", lambda x: "This will be implemented in the future")
     HELP = CMDOption("You know what this function works you eejit!", display_help)
