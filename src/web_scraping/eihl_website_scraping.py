@@ -9,7 +9,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from settings.settings import eihl_schedule_url, eihl_match_url
-from src.utils import extract_date_from_str, extract_float_from_str, get_html_content, get_start_end_dates_from_str_list
+from src.utils import extract_date_from_str, extract_float_from_str, get_html_content, get_date_range_from_str_list
 
 
 def get_eihl_championship_options(schedule_url: str = eihl_schedule_url):
@@ -38,7 +38,7 @@ def get_start_end_dates_from_gamecentre(schedule_url: str) -> tuple[datetime or 
     html_content = res_beaus.find("body").find("main").find(class_="wrapper")
     html_content = html_content.find(class_="container-fluid text-center text-md-left")
     html_text: str = html_content.get_text(separator=",", strip=True)
-    start_date, end_date = get_start_end_dates_from_str_list(html_text)
+    start_date, end_date = get_date_range_from_str_list(html_text)
     return start_date, end_date
 
 
@@ -97,10 +97,9 @@ def get_team_stats_from_list(away_team_stats, home_team_stats, stat_float_regex,
         i += 1
 
 
-def get_eihl_web_match_id(match_row_html: bs4.Tag) -> int or None:
-    a_tag = match_row_html.find("a")
+def get_eihl_web_match_id(url: str) -> int or None:
     try:
-        game_web_id = re.findall(r"(?<=/game/).*$", a_tag.get('href', None))[0]
+        game_web_id = re.findall(r"(?<=/game/).*$", url)[0]
         return game_web_id
     except Exception:
         print(f"{game_web_id} is not a valid number")
@@ -108,28 +107,63 @@ def get_eihl_web_match_id(match_row_html: bs4.Tag) -> int or None:
     return None
 
 
-def get_match_html_tags(url: str, html_content: BeautifulSoup = None) -> list[(bs4.Tag, datetime.date)]:
-    if html_content is None:
-        res_beaus = get_html_content(url)
+def get_match_info_from_match_page(match_url: str) -> dict:
+    match_info = defaultdict()
+    res_beaus = get_html_content(match_url)
+    html_content = res_beaus.find("body").find("main").find(class_="wrapper").find("article")
+    match_divs = html_content.find("div")
+    if match_divs is None:
+        print(f"No match information was able for match URL: {match_url}")
+        raise Exception
 
-        html_content = res_beaus.find("body").find("main").find(class_="wrapper")
-        html_content = html_content.find(class_="container-fluid text-center text-md-left")
+    match_info["eihl_web_match_id"] = get_eihl_web_match_id(match_url)
+    try:
+        match_dt_str = match_divs.find("div").get_text().strip()
+        match_datetime = extract_date_from_str(match_dt_str, "%d %b %Y, %H:%M")
+        if match_datetime is None:
+            match_datetime = extract_date_from_str(match_dt_str, "%d %b %Y")
+        match_info["match_date"] = match_datetime
+    except (AttributeError, TypeError, KeyError):
+        match_info["match_date"] = None
 
-    matches = []
-    match_date = None
-    for tag in html_content:
-        game_date_text = tag.get_text()
-        game_date = extract_date_from_str(game_date_text, "%A %d.%m.%Y")
-        if game_date is not None and match_date != game_date_text:
-            match_date = game_date
+    match_overview_div = None
+    for div in match_divs:
+        try:
+            img_tags = div.findAll("img")
+        except AttributeError:
+            continue
+        # Div with team logos is the one with the scores
+        if len(img_tags) > 0:
+            match_overview_div = div
+            break
 
-        if tag.name == "div" and len(tag.find_all()) > 0:
-            matches.append((tag, match_date))
-    return matches
+    home_team_info = match_overview_div.find("div")
+    match_info["home_team"] = " ".join([x for x in home_team_info.find("a").stripped_strings])
+
+    match_score_div = home_team_info.find_next_sibling(lambda x: x.name == "div" and len(x.findAll("img")) == 0)
+    match_ending_text = match_score_div.find("div").get_text().strip()
+    match_info["match_win_type"] = None
+    if match_ending_text == "end":
+        match_info["match_win_type"] = "R"
+    elif match_ending_text == "end after shootout":
+        match_info["match_win_type"] = "SO"
+    elif match_ending_text == "end after overtime":
+        match_info["match_win_type"] = "OT"
+    raw_score = match_score_div.findAll("div", attrs={'class': 'match-score'})[0].get_text()
+    try:
+        home_score, away_score = map(int, raw_score.split(":"))
+    except (TypeError, ValueError):
+        home_score, away_score = None, None
+    match_info["home_score"] = home_score
+    match_info["away_score"] = away_score
+
+    away_team_info = match_score_div.find_next_sibling(lambda x: x.name == "div" and len(x.findAll("img")) == 0)
+    match_info["away_team"] = " ".join([x for x in away_team_info.find("a").stripped_strings])
+    return match_info
 
 
-def get_matches(url: str, html_content: BeautifulSoup = None, start_date: datetime = datetime.min,
-                end_date: datetime = datetime.max, teams: list or tuple = None):
+def get_matches_from_web_gamecentre(url: str, html_content: BeautifulSoup = None, start_date: datetime = datetime.min,
+                                    end_date: datetime = datetime.max, teams: list or tuple = None):
     if teams is None:
         teams = []
     if html_content is None:
@@ -153,7 +187,7 @@ def get_matches(url: str, html_content: BeautifulSoup = None, start_date: dateti
             elif match_date > end_date:
                 break
         if tag.name == "div" and len(tag.find_all()) > 0:
-            match_info = extract_match_info_from_tag(tag)
+            match_info = extract_match_team_score_from_tag(tag)
             match_info["match_date"] = match_date
             try:
                 match_info["match_date"] = datetime.combine(match_date, match_info.pop("match_time"))
@@ -164,9 +198,13 @@ def get_matches(url: str, html_content: BeautifulSoup = None, start_date: dateti
     return matches
 
 
-def extract_match_info_from_tag(tag) -> dict:
+def extract_match_team_score_from_tag(tag) -> dict:
     match_info = defaultdict()
-    match_info["eihl_web_match_id"] = get_eihl_web_match_id(tag)
+    try:
+        match_url = tag.find("a")['href']
+    except Exception:
+        match_url = None
+    match_info["eihl_web_match_id"] = get_eihl_web_match_id(match_url)
     match_details = [r.text.strip() for r in tag.contents]
     match_details = [x for x in match_details if x.lower() not in ("", "details")]
 
@@ -238,7 +276,7 @@ def get_match_player_stats(url: str) -> defaultdict[pd.DataFrame]:
                 if table_tag is not None:
                     table_tag = tag
                     break
-        # TODO Change if statement to try except
+        # TODO Change if statement to try except (use AttributeError?)
         if isinstance(table_tag, bs4.Tag):
             try:
                 player_stat_dtf = pd.read_html(str(table_tag))[0]
@@ -250,32 +288,43 @@ def get_match_player_stats(url: str) -> defaultdict[pd.DataFrame]:
                 game_stats[team_name]["Position"] = game_stats[team_name]["Position"].fillna("GW")
             except KeyError:
                 pass
+        else:
+            print("Not a tag")
         head_index += 1
     return game_stats
 
 
-def get_gamecentre_month_id(month_num: int = None) -> int:
+def get_gamecentre_month_id(month: str = None) -> int:
     """
-
     Args:
-        month_num: the month of the year in number form (e.g. January = 1, March = 3, October = 10 etc)
-
+        month: the month of the year (e.g. January, Sep, March, Aug, October etc)
     Returns: month ID
-
     """
-    if month_num is None:
+    if month is None:
         return 999
-    elif month_num > 12:
-        print(f"Month number {month_num} is Invalid")
+    month_num = None
+    month_fmt = "%b" if len(month) <= 4 else "%B"
+
+    try:
+        month_num = datetime.strptime(month, month_fmt).month
+    except Exception:
+        print(f"Month {month} is Invalid")
     return month_num
 
 
-# TODO finish function
-def get_gamecentre_team_id(team_name: str = None):
+def get_gamecentre_team_id(team_name: str = None, season_id=None):
     if team_name is None:
         return 0
-    else:
-        return team_name
+    team_id = None
+    if season_id is not None:
+        html_content = get_html_content(eihl_schedule_url)
+        team_dropdown_option = html_content.find("select", id="id_team")
+        team_option = team_dropdown_option.find("option", text=team_name)
+        try:
+            team_id = int(re.findall(r"(?<=id_team=)+?(\d+)", team_option.get("value"))[0])
+        except Exception:
+            print(f"Cannot find ID for {team_name} for season: {season_id}")
+    return team_id
 
 
 def get_gamecentre_url(season_id: int, team_id: int = 0, month_id: int = 999, base_url: str = eihl_schedule_url) -> str:

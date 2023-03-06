@@ -61,7 +61,7 @@ def get_url_links(seed_url):
 
     # Used to check if url has been spotted
     url_spotted = []
-    # TODO make the max_depth configurable in config file
+
     max_depth = 3
     while to_crawl:
         url_tup = to_crawl.pop()

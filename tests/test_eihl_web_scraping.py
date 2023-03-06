@@ -4,7 +4,7 @@ import pytest
 
 from settings.settings import eihl_schedule_url
 from src.web_scraping.eihl_website_scraping import extract_team_match_stats, get_eihl_championship_options, \
-    get_start_end_dates_from_gamecentre
+    get_start_end_dates_from_gamecentre, get_gamecentre_team_id, get_match_info_from_match_page
 
 
 @pytest.mark.parametrize("match_url,expected",
@@ -68,6 +68,31 @@ def test_get_eihl_championship_options():
         champ_options = get_eihl_championship_options(url)
     except Exception:
         pytest.fail()
+
+
+@pytest.mark.parametrize("team_name,season_id,expected_id", [("Belfast Giants", 36, 310)])
+def test_get_gamecentre_team_id(team_name, season_id, expected_id):
+    try:
+        team_id = get_gamecentre_team_id(team_name, season_id)
+        assert team_id == expected_id
+    except Exception:
+        pytest.fail()
+
+
+@pytest.mark.parametrize("match_url,expected", [("https://www.eliteleague.co.uk/game/4002-fif-she",
+                                                 {'eihl_web_match_id': '4002-fif-she',
+                                                  'match_time': datetime.time(19, 0),
+                                                  'match_date': datetime.date(2023, 1, 25), 'home_team': 'Fife Flyers',
+                                                  'match_win_type': 'R', 'home_score': 3, 'away_score': 2,
+                                                  'away_team': 'Sheffield Steelers'}),
+                                                ("https://www.eliteleague.co.uk/game/2154-lon-bas",
+                                                 {'eihl_web_match_id': '2154-lon-bas',
+                                                  'match_date': datetime.date(2004, 3, 2), 'home_team': 'London Racers',
+                                                  'home_score': 4, 'away_score': 0, 'away_team': 'Basingstoke Bison'})
+                                                ])
+def test_get_info_from_match_webpage(match_url, expected):
+    match_info = get_match_info_from_match_page(match_url)
+    print(match_info)
 
 
 def test_get_eihl_web_match_id():

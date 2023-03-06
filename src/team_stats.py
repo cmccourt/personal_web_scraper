@@ -34,6 +34,7 @@ def team_stats_consumer(stat_queue, db_object_func):
                 # TODO data source handler should handle column name conversions
                 team_stats["team_name"] = match_info.get(k, None)
                 team_stats["match_id"] = match_info.get("match_id", None)
+                team_stats = {db_handler.match_team_stats_cols.get(k, k): v for k, v in team_stats.items()}
                 insert_team_match_stats_to_db(db_handler, team_stats)
         except Exception:
             traceback.print_exc()
@@ -56,7 +57,8 @@ def insert_team_match_stats_to_db(db_handler: EIHLMysqlHandler, team_match_stats
         else:
             print(f"Match ID: {match_id} team: {team_name} stats inserted!")
     else:
-        print(f"THERE ARE DUPLICATE records for team stats for match ID {match_id}, team: {team_name}.")
+        db_handler.update_data("match_team_stats", team_match_stats,
+                               where_clause="match_id=%(match_id)s AND team_name=%(team_name)s")
 
 
 def update_match_team_stats(db_obj_func: callable, num_threads=5, matches: list[dict] = None):

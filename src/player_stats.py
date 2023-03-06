@@ -33,6 +33,8 @@ def insert_player_stats_to_db(db_handler: EIHLMysqlHandler, *player_match_stats:
                 db_handler.insert_data("match_player_stats", player_stats)
             else:
                 print(f"Match ID {match_id} team: {team_name}, player: {player_name} stats already exists in DB.")
+                db_handler.update_data("match_player_stats", player_stats)
+                print(f"Match ID {match_id} team: {team_name}, player: {player_name} Updated Successfully.")
         except Exception:
             traceback.print_exc()
 

@@ -1,11 +1,23 @@
 import re
+from dataclasses import dataclass, field
 from datetime import datetime
 
 import requests
 from bs4 import BeautifulSoup
 
 
-def get_start_end_dates_from_str_list(text: list or tuple):
+@dataclass()
+class MatchInfo:
+    match_date: datetime = field(default_factory=datetime)
+    home_team: str = field(default=None)
+    away_team: str = field(default=None)
+    home_score: int = field(default=None)
+    away_score: int = field(default=None)
+    home_team_info: dict = field(default_factory=dict, kw_only=True)
+    away_team_info: dict = field(default_factory=dict, kw_only=True)
+
+
+def get_date_range_from_str_list(text: list or tuple):
     start_date = None
     end_date = None
     for dt_regex, dt_fmt in ((r"([0-9]{2}/[0-9]{2}/[0-9]{4})", '%d/%m/%Y'),

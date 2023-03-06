@@ -12,7 +12,6 @@ mysql_db_config = {
     "host": "localhost",
     "port": "3306"}
 
-# TODO create team URLs here
 eihl_base_url = "https://www.eliteleague.co.uk/"
 eihl_team_url = f"{eihl_base_url}team/"
 eihl_schedule_url = f"{eihl_base_url}schedule/"

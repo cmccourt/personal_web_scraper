@@ -4,8 +4,9 @@ from pprint import pprint
 
 # TODO Create Protocol for DB handler
 from src.data_handlers.eihl_mysql import EIHLMysqlHandler
-from src.web_scraping.eihl_website_scraping import get_matches, get_gamecentre_month_id, \
-    get_gamecentre_team_id, get_gamecentre_url, get_eihl_championship_options, get_start_end_dates_from_gamecentre
+from src.web_scraping.eihl_website_scraping import get_matches_from_web_gamecentre, get_gamecentre_url, \
+    get_eihl_championship_options, get_start_end_dates_from_gamecentre, \
+    get_match_info_from_match_page
 
 
 # TODO Create team season ID table in DB to hold team ID for each season
@@ -18,21 +19,16 @@ def get_db_season_ids(db_handler: EIHLMysqlHandler, seasons: list[str] = None):
     return season_ids
 
 
-def insert_match_to_db(db_handler: EIHLMysqlHandler, match: dict, update_exist_matches=False):
+def update_db_match(db_handler, match: dict, where_clause=None):
     try:
-        # TODO Is there potential for SQL injection?
-        where_clause = "match_date=%(match_date)s AND home_team=%(home_team)s AND away_team=%(away_team)s"
-        dup_records = db_handler.get_dup_records(params=match, table="match", where_clause=where_clause)
-        if len(dup_records) > 1:
-            # TODO Implement logging for this scenario
-            print(f"More than 1 duplicate for match: {match}")
-        elif len(dup_records) == 0:
-            db_handler.insert_data("match", match)
-        elif update_exist_matches and \
-                (dup_records[0].get("home_score", None) is None or dup_records[0].get("away_score", None) is None):
-            db_handler.update_data("match", match, where_clause)
-        else:
-            print(f"Not overwriting existing match: {match}")
+        db_handler.update_data("match", match, where_clause)
+    except Exception:
+        traceback.print_exc()
+
+
+def insert_match_to_db(db_handler: EIHLMysqlHandler, match: dict):
+    try:
+        db_handler.insert_data("match", match)
     except Exception:
         traceback.print_exc()
 
@@ -80,23 +76,42 @@ def get_db_matches(db_handler: EIHLMysqlHandler, teams: list[str] = None,
     return matches
 
 
-def update_all_eihl_matches_to_db(db_handler, overwrite_exist_matches=False, num_threads=4):
-    gc_team_id = get_gamecentre_team_id()
-    gc_month_id = get_gamecentre_month_id()
-    seasons = get_db_season_ids(db_handler)
-    if seasons is None or len(seasons) == 0:
-        seasons = get_eihl_championship_options()
-        insert_championship_to_db(db_handler, *seasons)
+def update_match_scores(db_handler: EIHLMysqlHandler, match_urls):
+    dup_clause = "match_date=%(match_date)s AND home_team=%(home_team)s AND away_team=%(away_team)s"
+    for match_url in match_urls:
+        match_info = get_match_info_from_match_page(match_url)
+        dup_records = db_handler.get_dup_records(match_info, table="match", where_clause=dup_clause)
+
+        if dup_records and \
+                (dup_records[0].get("home_score", None) is None or dup_records[0].get("away_score", None) is None):
+            db_handler.update_data("match", match_info, where_clause=dup_clause)
+            print(f"Match Successfully updated: {match_url}")
+        else:
+            print(f"ERROR cannot find {match_info} in DB")
+            # insert_match_to_db(db_handler, match_info)
+            # print(f"Match inserted into DB: {match_url}")
+
+
+def update_eihl_scores_from_game_centre(db_handler, team_ids=None, month_ids=None, season_ids=None):
+    # TODO Is there potential for SQL injection?
+    dup_clause = "match_date=%(match_date)s AND home_team=%(home_team)s AND away_team=%(away_team)s"
 
     try:
-        for season in seasons:
+        for season in season_ids:
             season_id = season["eihl_web_id"]
-            season_gamecentre_url = get_gamecentre_url(season_id, gc_team_id, gc_month_id)
-            season_matches = get_matches(season_gamecentre_url)
+            season_gamecentre_url = get_gamecentre_url(season_id, team_ids, month_ids)
+            season_matches = get_matches_from_web_gamecentre(season_gamecentre_url)
+            update_match_scores(db_handler, season_matches)
             for match in season_matches:
                 pprint(match)
                 # TODO should the data storage class handle column name conversions?
                 match.update({"championship_id": season_id})
-                insert_match_to_db(db_handler, match, overwrite_exist_matches)
+
+                dup_records = db_handler.get_dup_records(params=match, table="match", where_clause=dup_clause)
+                if len(dup_records) > 1:
+                    # TODO Implement logging for this scenario
+                    print(f"More than 1 duplicate for match: {match}")
+                elif len(dup_records) == 0:
+                    insert_match_to_db(db_handler, match)
     except Exception:
         traceback.print_exc()
