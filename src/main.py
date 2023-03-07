@@ -1,4 +1,4 @@
-import dataclasses
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import Callable, Tuple
@@ -18,11 +18,11 @@ from src.web_scraping.eihl_website_scraping import get_gamecentre_team_id, get_e
 db_handler_func = EIHLMysqlHandler
 
 
-@dataclasses.dataclass(init=True)
+@dataclass(init=True)
 class CMDOption:
     help: str or None
     action: Callable
-    params: Tuple or None = None
+    params: Tuple = field(default=())
 
 
 def display_help():
