@@ -47,7 +47,7 @@ def insert_championship_to_db(data_source_hdlr: EIHLMysqlHandler, *championships
 
 
 def refresh_championships(db_handler: EIHLMysqlHandler):
-    db_champs = db_handler.fetch_all_data(Query.from_("championship").select(Field("eihl_web_id"), Field("name")))
+    db_champs = db_handler.fetch_all_data(table='championship', columns=[Field("eihl_web_id"), Field("name")])
     eihl_web_champs = get_eihl_championship_options()
     if eihl_web_champs == db_champs:
         print(f"All championship options are stored in the database")
