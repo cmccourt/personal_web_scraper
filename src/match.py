@@ -2,6 +2,8 @@ import traceback
 from datetime import datetime
 from pprint import pprint
 
+from pypika import Query, Field, Parameter
+
 # TODO Create Protocol for DB handler
 from src.data_handlers.eihl_mysql import EIHLMysqlHandler
 from src.web_scraping.eihl_website_scraping import get_matches_from_web_gamecentre, get_gamecentre_url, \
@@ -15,7 +17,7 @@ def get_db_season_ids(db_handler: EIHLMysqlHandler, seasons: list[str] = None):
     season_ids = None
     if seasons is None:
         # get all EIHL season ids to iterate through
-        season_ids = db_handler.fetch_all_data("SELECT eihl_web_id FROM championship")
+        season_ids = db_handler.fetch_all_data(Query.from_("championship").select("eihl_web_id"))
     return season_ids
 
 
@@ -45,7 +47,7 @@ def insert_championship_to_db(data_source_hdlr: EIHLMysqlHandler, *championships
 
 
 def refresh_championships(db_handler: EIHLMysqlHandler):
-    db_champs = db_handler.fetch_all_data(table="championship", cols="eihl_web_id, name")
+    db_champs = db_handler.fetch_all_data(Query.from_("championship").select(Field("eihl_web_id"), Field("name")))
     eihl_web_champs = get_eihl_championship_options()
     if eihl_web_champs == db_champs:
         print(f"All championship options are stored in the database")
@@ -65,19 +67,18 @@ def get_db_matches(db_handler: EIHLMysqlHandler, teams: list[str] = None,
         start_date = datetime.min
     if not end_date:
         end_date = datetime.max
-    if not teams:
-        matches = db_handler.fetch_all_data("SELECT * FROM `match` WHERE match_date BETWEEN %(start_date)s "
-                                            "AND %(end_date)s",
-                                            {"start_date": start_date, "end_date": end_date})
-    else:
-        matches = db_handler.fetch_all_data("SELECT * FROM `match` WHERE match_date BETWEEN %(start_date)s "
-                                            "AND %(end_date)s AND (home_team IN %(teams)s OR away_team IN %(teams)s)",
-                                            {"teams": teams, "start_date": start_date, "end_date": end_date})
+    match_query = Query.from_("match").select("*").where((Field("match_date").between(start_date, end_date)))
+    if teams:
+        match_query = match_query.where((Field("home_team").isin(teams)) | (Field("away_team").isin(teams)))
+
+    matches = db_handler.fetch_all_data(str(match_query))
     return matches
 
 
 def update_match_scores(db_handler: EIHLMysqlHandler, match_urls):
-    dup_clause = "match_date=%(match_date)s AND home_team=%(home_team)s AND away_team=%(away_team)s"
+    dup_clause = ((Field("match_date") == Parameter("%(match_date)s")) &
+                  (Field("home_team") == Parameter("%(home_team)s")) &
+                  (Field("away_team") == Parameter("%(away_team)s")))
     for match_url in match_urls:
         match_info = get_match_info_from_match_page(match_url)
         dup_records = db_handler.get_dup_records(match_info, table="match", where_clause=dup_clause)
@@ -88,13 +89,12 @@ def update_match_scores(db_handler: EIHLMysqlHandler, match_urls):
             print(f"Match Successfully updated: {match_url}")
         else:
             print(f"ERROR cannot find {match_info} in DB")
-            # insert_match_to_db(db_handler, match_info)
-            # print(f"Match inserted into DB: {match_url}")
 
 
 def update_eihl_scores_from_game_centre(db_handler, team_ids=None, month_ids=None, season_ids=None):
-    # TODO Is there potential for SQL injection?
-    dup_clause = "match_date=%(match_date)s AND home_team=%(home_team)s AND away_team=%(away_team)s"
+    dup_clause = ((Field("match_date") == Parameter("%(match_date)s")) &
+                  (Field("home_team") == Parameter("%(home_team)s")) &
+                  (Field("away_team") == Parameter("%(away_team)s")))
 
     try:
         for season in season_ids:
