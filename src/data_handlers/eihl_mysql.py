@@ -75,13 +75,14 @@ class EIHLMysqlHandler:
         else:
             print("ERROR unable to print SQL! No DB connection available!\n")
 
-    def fetch_all_data(self, query: str = None, params: dict = None,
-                       table: str = None, columns: list[str] = None):
+    def fetch_all_data(self, query: MySQLQuery or str = None, params: dict = None,
+                       table: str = None, columns: list = None):
         try:
             if query is None:
                 query = MySQLQuery.from_(table)
-                query = str(query.select(*columns) if columns is not None else query.select("*"))
-
+                query = query.select(*columns) if columns is not None else query.select("*")
+            if not isinstance(query, str):
+                query = str(query)
             with self.db_conn.cursor(dictionary=True) as db_cur:
                 db_cur.execute(query, params)
                 result = db_cur.fetchall()
@@ -128,11 +129,16 @@ class EIHLMysqlHandler:
 
     def get_dup_records(self, params: dict = None, query=None, table: str = None,
                         where_clause: Criterion = None) -> Sequence[Any]:
+        if params is None:
+            params = {}
         if query is not None:
             records = self.fetch_all_data(query)
         else:
-            dup_match_query = MySQLQuery.Table(table)
-            if where_clause is None:
+            dup_match_query = MySQLQuery.from_(table).select("*")
+            if where_clause is not None:
                 dup_match_query = dup_match_query.where(where_clause)
+            for col, val in params.items():
+                dup_match_query = dup_match_query.where(Field(col) == val)
+
             records = self.fetch_all_data(str(dup_match_query), params)
         return records
