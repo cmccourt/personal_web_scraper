@@ -2,12 +2,10 @@ import traceback
 from typing import Any, Sequence
 
 from mysql.connector import connect, connection
+from pypika import MySQLQuery, Field, Criterion
+from sqlalchemy import create_engine
 
 from settings.settings import mysql_db_config
-
-
-def generate_and_where_clause(params):
-    return " AND ".join([f"{k}=%({k})s" if v is not None else f"{k} IS %({k})s" for k, v in params.items()])
 
 
 class EIHLMysqlHandler:
@@ -53,6 +51,10 @@ class EIHLMysqlHandler:
         self.db_conn: connection = db_conn
         if not self.db_conn:
             self.db_conn = connect(**db_config)
+            self.db_engine = create_engine(
+                f"mysql+pymysql://{db_config.get('un', '')}:{db_config.get('pw', '')}@"
+                f"{db_config.get('host', '')}:{db_config.get('port', '')}/{db_config.get('db', '')}",
+                echo=True)
 
     def shut_down(self):
         if self.db_conn:
@@ -74,14 +76,13 @@ class EIHLMysqlHandler:
             print("ERROR unable to print SQL! No DB connection available!\n")
 
     def fetch_all_data(self, query: str = None, params: dict = None,
-                       table: str = None, cols: str = None):
+                       table: str = None, *columns: str):
         try:
+            if query is None:
+                query = MySQLQuery.from_(table)
+                query = str(query.select(*columns) if len(columns) > 0 else query.select("*"))
+
             with self.db_conn.cursor(dictionary=True) as db_cur:
-                if table is not None:
-                    query = "SELECT {} FROM {}".format(cols if cols else "*",
-                                                       f"`{table}`" if table[0] != "`" and table[len(table) - 1] != "`"
-                                                       else table
-                                                       )
                 db_cur.execute(query, params)
                 result = db_cur.fetchall()
                 return result
@@ -100,46 +101,38 @@ class EIHLMysqlHandler:
             else:
                 self.db_conn.commit()
 
-    def insert_data(self, table: str, new_val_dict: dict):
+    def insert_data(self, table_name: str, new_val_dict: dict):
 
-        query = "INSERT INTO {} ({}) VALUES ({})".format(
-            f"`{table}`" if table[0] != "`" and table[len(table) - 1] != "`" else table,
-            ", ".join(new_val_dict),
-            ", ".join([f"%({x})s" for x in new_val_dict])
-        )
+        query = str(MySQLQuery.into(table_name).columns(list(new_val_dict.keys())).insert(list(new_val_dict.values())))
         try:
             # print(db_cur.mogrify(query, player_match_stats))
-            self.execute_query(query, new_val_dict)
+            self.execute_query(query)
         except TypeError:
             traceback.print_exc()
 
-    def update_data(self, table: str, update_values: dict, where_clause: str = None):
-        if where_clause is None:
-            where_clause = generate_and_where_clause(update_values)
-
-        update_cond = ", ".join([f"{k}=%({k})s" for k, v in update_values.items()])
+    def update_data(self, table_name: str, update_values: dict, where_clause: Criterion = None):
         try:
-            query = "UPDATE {} SET {} WHERE {}".format(
-                f"`{table}`" if table[0] != "`" and table[len(table) - 1] != "`" else table,
-                update_cond, where_clause)
+            new_query = MySQLQuery.update(table_name)
+            for key in update_values:
+                new_query = new_query.set(key, update_values[key])
+            if where_clause:
+                new_query = new_query.where(where_clause)
+            else:
+                for col in update_values:
+                    new_query = new_query.where(Field(col) == update_values[col])
             print(f"Updating existing stats data for Values: {update_values}")
             # print(db_cur.mogrify(query, player_match_stats))
-            self.execute_query(query, update_values)
-            # db_cur.execute(query, player_match_stats)
+            self.execute_query(str(new_query), update_values)
         except TypeError:
             traceback.print_exc()
 
     def get_dup_records(self, params: dict = None, query=None, table: str = None,
-                        where_clause: str = None) -> Sequence[Any]:
-        records = []
-        if where_clause is None:
-            where_clause = generate_and_where_clause(params)
+                        where_clause: Criterion = None) -> Sequence[Any]:
         if query is not None:
             records = self.fetch_all_data(query)
         else:
-            dup_match_sql = "SELECT * FROM {} WHERE {}".format(
-                f"`{table}`" if table[0] != "`" and table[len(table) - 1] != "`" else table,
-                where_clause
-            )
-            records = self.fetch_all_data(dup_match_sql, params)
+            dup_match_query = MySQLQuery.Table(table)
+            if where_clause is None:
+                dup_match_query = dup_match_query.where(where_clause)
+            records = self.fetch_all_data(str(dup_match_query), params)
         return records
