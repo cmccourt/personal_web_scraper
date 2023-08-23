@@ -3,6 +3,8 @@ from datetime import datetime
 from enum import Enum
 from typing import Callable, Tuple
 
+from pypika import Query, Field, Table
+
 from settings.settings import eihl_match_url
 from src.data_handlers.eihl_mysql import EIHLMysqlHandler
 # from src.data_handlers.eihl_postgres import EIHLPostgresHandler
@@ -75,20 +77,63 @@ def refresh_db():
 def update_recent_data():
     db_handler = db_handler_func()
     refresh_championships(db_handler)
-    matches = db_handler.fetch_all_data("SELECT * FROM `match` WHERE home_score IS NULL or away_score IS NULL")
+    match_query = Query.from_("match").select("*")
+
+    matches = db_handler.fetch_all_data(
+        str(match_query.where((Field("home_score").isnull()) | (Field("away_score").isnull()))))
     if len(matches) > 0:
-        match_urls = [f"{eihl_match_url}{match.get('eihl_web_match_id', None)}" for match in matches]
-        update_match_scores(db_handler, match_urls)
-        missing_team_stat_games = db_handler.fetch_all_data(
-            """SELECT * FROM `match` WHERE match_id IN (SELECT m.match_id FROM `match` m LEFT JOIN match_team_stats mts ON m.match_id = mts.match_id 
-GROUP BY m.match_id, mts.shots, mts.saves, m.home_score, m.away_score HAVING mts.shots=0 or mts.saves=0 OR m.home_score IS NULL or m.away_score IS NULL)""")
-        update_match_team_stats(db_handler_func, matches=missing_team_stat_games)
-        missing_player_stat_games = db_handler.fetch_all_data(
-            """SELECT * FROM `match` WHERE match_id IN (SELECT m.match_id FROM `match` m LEFT JOIN match_player_stats mps ON mps.match_id = m.match_id 
-GROUP BY m.match_id, mps.goals, mps.shutouts, m.home_score, m.away_score HAVING (mps.goals=0 AND mps.shutouts=0) OR m.home_score IS NULL or m.away_score IS NULL)""")
-        update_players_stats(db_handler_func, matches=missing_player_stat_games)
+        update_match_scores(db_handler,
+                            [f"{eihl_match_url}{match.get('eihl_web_match_id', None)}" for match in matches])
+        match_table = Table("match")
+        update_team_stats(db_handler, match_table, match_query)
+
+        update_player_stats(db_handler, match_query, match_table)
     else:
         print("There are no matches to update!")
+
+
+def update_player_stats(db_handler, match_query, match_table):
+    player_stats_table = Table("match_player_stats")
+    player_sub_query = Query() \
+        .from_(match_table) \
+        .select(match_table.match_id) \
+        .left_join(player_stats_table) \
+        .on(match_table.match_id == player_stats_table.match_id) \
+        .groupby(match_table.match_id, player_stats_table.goals, player_stats_table.shutouts,
+                 match_table.home_score, match_table.away_score) \
+        .having(
+        ((player_stats_table.goals == 0) & (player_stats_table.shutouts == 0)) |
+        (player_stats_table.saves == 0) | (match_table.home_score.isnull()) |
+        (match_table.away_score.isnull()))
+    miss_player_stat_query = str(match_query.where(Field("match_id").isin(player_sub_query)))
+    missing_player_stat_games = db_handler.fetch_all_data(miss_player_stat_query)
+    # missing_player_stat_games = db_handler.fetch_all_data( """SELECT * FROM `match` WHERE match_id IN (SELECT
+    # m.match_id FROM `match` m LEFT JOIN match_player_stats mps ON mps.match_id = m.match_id GROUP BY
+    # m.match_id, mps.goals, mps.shutouts, m.home_score, m.away_score HAVING (mps.goals=0 AND mps.shutouts=0) OR
+    # m.home_score IS NULL or m.away_score IS NULL)""")
+    update_players_stats(db_handler_func, matches=missing_player_stat_games)
+
+
+def update_team_stats(db_handler, match_table, match_query):
+    team_stats_table = Table("match_team_stats")
+
+    team_sub_query = Query() \
+        .from_(match_table) \
+        .select(match_table.match_id) \
+        .left_join(team_stats_table) \
+        .on(match_table.match_id == team_stats_table.match_id) \
+        .groupby(match_table.match_id, team_stats_table.shots, team_stats_table.saves,
+                 match_table.home_score, match_table.away_score) \
+        .having((team_stats_table.shots == 0) | (team_stats_table.saves == 0) | (match_table.home_score.isnull()) |
+                (match_table.away_score.isnull()))
+    missing_team_stat_games = db_handler.fetch_all_data(
+        str(match_query.where(Field("match_id").isin(team_sub_query))))
+    # missing_team_stat_games = db_handler.fetch_all_data( """SELECT * FROM `match` WHERE match_id IN (SELECT
+    # m.match_id FROM `match` m LEFT JOIN match_team_stats mts ON m.match_id = mts.match_id GROUP BY m.match_id,
+    # mts.shots, mts.saves, m.home_score, m.away_score HAVING mts.shots=0 or mts.saves=0 OR m.home_score IS NULL
+    # or m.away_score IS NULL)""")
+    update_match_team_stats(db_handler_func, matches=missing_team_stat_games)
+
 
 
 class Options(Enum):
