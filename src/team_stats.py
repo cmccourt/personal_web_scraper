@@ -3,6 +3,8 @@ from datetime import datetime
 from queue import Queue
 from threading import Thread
 
+from pypika import Parameter, Field
+
 # TODO Create Protocol for DB handler
 from src.data_handlers.eihl_mysql import EIHLMysqlHandler
 from src.match import get_db_matches
@@ -47,7 +49,10 @@ def insert_team_match_stats_to_db(db_handler: EIHLMysqlHandler, team_match_stats
     team_name = team_match_stats.get("team_name", None)
     match_id = team_match_stats.get("match_id", None)
     dup_records = db_handler.get_dup_records(params=team_match_stats, table="match_team_stats",
-                                             where_clause="match_id=%(match_id)s AND team_name=%(team_name)s")
+                                             where_clause=((Field("match_id") == Parameter("%(match_id)s")) &
+                                                           (Field("team_name") == Parameter("%(team_name)s"))
+                                                           )
+                                             )
 
     if len(dup_records) == 0:
         try:
@@ -58,7 +63,10 @@ def insert_team_match_stats_to_db(db_handler: EIHLMysqlHandler, team_match_stats
             print(f"Match ID: {match_id} team: {team_name} stats inserted!")
     else:
         db_handler.update_data("match_team_stats", team_match_stats,
-                               where_clause="match_id=%(match_id)s AND team_name=%(team_name)s")
+                               where_clause=((Field("match_id") == Parameter("%(match_id)s")) &
+                                             (Field("team_name") == Parameter("%(team_name)s"))
+                                             )
+                               )
 
 
 def update_match_team_stats(db_obj_func: callable, num_threads=5, matches: list[dict] = None):
