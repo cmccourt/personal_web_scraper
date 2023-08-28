@@ -162,7 +162,8 @@ def get_match_info_from_match_page(match_url: str) -> dict:
     return match_info
 
 
-def get_matches_from_web_gamecentre(url: str, html_content: BeautifulSoup = None, start_date: datetime = datetime.min,
+def get_matches_from_web_gamecentre(url: str = eihl_schedule_url, html_content: BeautifulSoup = None,
+                                    start_date: datetime = datetime.min,
                                     end_date: datetime = datetime.max, teams: list or tuple = None):
     if teams is None:
         teams = []

@@ -9,6 +9,7 @@ from settings.settings import mysql_db_config
 
 
 class EIHLMysqlHandler:
+    query = MySQLQuery
     match_player_stats_cols = {
         "Jersey": "jersey",
         "Player name": "player_name",
@@ -30,7 +31,8 @@ class EIHLMysqlHandler:
         "SA": "shots_against",
         "GA": "goals_against",
         "MIN": "mins_played",
-        "SVS%": "save_percentage"
+        "SVS%": "save_percentage",
+        "TOI": "toi"
     }
     match_team_stats_cols = {
         "Shots": "shots",

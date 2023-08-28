@@ -2,7 +2,7 @@ import traceback
 from datetime import datetime
 from pprint import pprint
 
-from pypika import Query, Field, Parameter
+from pypika import Field, Parameter
 
 # TODO Create Protocol for DB handler
 from src.data_handlers.eihl_mysql import EIHLMysqlHandler
@@ -17,7 +17,7 @@ def get_db_season_ids(db_handler: EIHLMysqlHandler, seasons: list[str] = None):
     season_ids = None
     if seasons is None:
         # get all EIHL season ids to iterate through
-        season_ids = db_handler.fetch_all_data(Query.from_("championship").select("eihl_web_id"))
+        season_ids = db_handler.fetch_all_data(db_handler.query.from_("championship").select("eihl_web_id"))
     return season_ids
 
 
@@ -67,7 +67,7 @@ def get_db_matches(db_handler: EIHLMysqlHandler, teams: list[str] = None,
         start_date = datetime.min
     if not end_date:
         end_date = datetime.max
-    match_query = Query.from_("match").select("*").where((Field("match_date").between(start_date, end_date)))
+    match_query = db_handler.query.from_("match").select("*").where((Field("match_date").between(start_date, end_date)))
     if teams:
         match_query = match_query.where((Field("home_team").isin(teams)) | (Field("away_team").isin(teams)))
 
@@ -95,23 +95,26 @@ def update_eihl_scores_from_game_centre(db_handler, team_ids=None, month_ids=Non
     dup_clause = ((Field("match_date") == Parameter("%(match_date)s")) &
                   (Field("home_team") == Parameter("%(home_team)s")) &
                   (Field("away_team") == Parameter("%(away_team)s")))
-
+    if season_ids is None:
+        season_ids = get_db_season_ids(db_handler)
     try:
         for season in season_ids:
             season_id = season["eihl_web_id"]
             season_gamecentre_url = get_gamecentre_url(season_id, team_ids, month_ids)
             season_matches = get_matches_from_web_gamecentre(season_gamecentre_url)
-            update_match_scores(db_handler, season_matches)
+            # update_match_scores(db_handler, season_matches)
             for match in season_matches:
                 pprint(match)
                 # TODO should the data storage class handle column name conversions?
                 match.update({"championship_id": season_id})
 
                 dup_records = db_handler.get_dup_records(params=match, table="match", where_clause=dup_clause)
-                if len(dup_records) > 1:
-                    # TODO Implement logging for this scenario
-                    print(f"More than 1 duplicate for match: {match}")
+                if len(dup_records) == 1:
+                    db_handler.update_data("match", match, where_clause=dup_clause)
                 elif len(dup_records) == 0:
                     insert_match_to_db(db_handler, match)
+                else:
+                    # TODO Implement logging for this scenario
+                    print(f"More than 1 duplicate for match: {match}")
     except Exception:
         traceback.print_exc()

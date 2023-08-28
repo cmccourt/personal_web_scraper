@@ -86,7 +86,7 @@ def player_stats_consumer(stat_queue, db_object_func):
     print('Consumer: Done')
 
 
-def update_players_stats(db_obj_func: Callable, matches: list[dict] = None, num_threads=5):
+def update_players_stats_to_db(db_obj_func: Callable, matches: list[dict] = None, num_threads=5):
     db_handler = db_obj_func()
     if matches is None or len(matches) == 0:
         matches = get_db_matches(db_handler, end_date=datetime.now())
