@@ -2,23 +2,15 @@ import traceback
 from datetime import datetime
 from queue import Queue
 from threading import Thread
-from typing import Callable
 
 import pandas as pd
 
-from settings.settings import eihl_match_url
-# TODO Create Protocol for DB handler
-from src.data_handlers.eihl_mysql import EIHLMysqlHandler
+from src.data_handlers.eihl_mysql import get_dup_records, insert_data, update_data, match_player_stats_cols
 from src.match import get_db_matches
-from src.web_scraping.eihl_website_scraping import extract_match_stats
+from src.web_scraping.website import Website
 
 
-def build_match_stats_url(eihl_web_match_id):
-    match_stats_url = f"{eihl_match_url}{eihl_web_match_id}/stats"
-    return match_stats_url
-
-
-def insert_player_stats_to_db(db_handler: EIHLMysqlHandler, *player_match_stats: dict):
+def insert_player_stats_to_db(*player_match_stats: dict):
     for player_stats in player_match_stats:
         team_name = player_stats.get("team_name", None)
         player_name = player_stats.get("player_name", None)
@@ -28,22 +20,22 @@ def insert_player_stats_to_db(db_handler: EIHLMysqlHandler, *player_match_stats:
                         for k, v in player_stats.items()}
 
         try:
-            if len(db_handler.get_dup_records(params=player_stats, table="match_player_stats")) == 0:
+            if len(get_dup_records(params=player_stats, table="match_player_stats")) == 0:
                 print(f"Match ID: {match_id}, team: {team_name}, player {player_name} stats to be inserted!")
-                db_handler.insert_data("match_player_stats", player_stats)
+                insert_data("match_player_stats", player_stats)
             else:
                 print(f"Match ID {match_id} team: {team_name}, player: {player_name} stats already exists in DB.")
-                db_handler.update_data("match_player_stats", player_stats)
+                update_data("match_player_stats", player_stats)
                 print(f"Match ID {match_id} team: {team_name}, player: {player_name} Updated Successfully.")
         except Exception:
             traceback.print_exc()
 
 
-def get_player_stats(db_handler, match=None, match_stats_url: str = None) -> list[dict]:
+def get_player_stats(website: Website, match=None, match_stats_url: str = None) -> list[dict]:
     player_stats = []
-    match_stats: pd.DataFrame = extract_match_stats(match_stats_url)
+    match_stats: pd.DataFrame = website.extract_match_info(match_stats_url)
     for team_name, team_stats in match_stats.items():
-        team_stats = team_stats.rename(columns=db_handler.match_player_stats_cols)
+        team_stats = team_stats.rename(columns=match_player_stats_cols)
         try:
             team_stats["team_name"] = team_name
             team_stats["match_id"] = match.get("match_id", None)
@@ -51,15 +43,15 @@ def get_player_stats(db_handler, match=None, match_stats_url: str = None) -> lis
             player_stats.append(team_stat_dicts)
         except AttributeError:
             traceback.print_exc()
-            return
     return player_stats
 
 
-def player_stats_producer(stat_queue, matches):
+def player_stats_producer(stat_queue, matches, website: Website):
     try:
         print("Producer: Running")
         for match_info in matches:
-            match_stats_url = build_match_stats_url(match_info.get("eihl_web_match_id", ""))
+            match_stats_url = website.get_match_stats_url()
+            # build_match_stats_url(match_info.get("eihl_web_match_id", ""))
             stat_queue.put((match_info, match_stats_url))
 
         print("Producer: Done")
@@ -68,17 +60,16 @@ def player_stats_producer(stat_queue, matches):
         traceback.print_exc()
 
 
-def player_stats_consumer(stat_queue, db_object_func):
+def player_stats_consumer(stat_queue):
     print("Consumer: Running")
-    db_handler = db_object_func()
     while True:
         match_info, match_url = stat_queue.get(block=True)
         if match_info is None:
             break
         try:
-            all_player_stats = get_player_stats(db_handler, match=match_info, match_stats_url=match_url)
+            all_player_stats = get_player_stats(match=match_info, match_stats_url=match_url)
             for team_player_stats in all_player_stats:
-                insert_player_stats_to_db(db_handler, *team_player_stats)
+                insert_player_stats_to_db(*team_player_stats)
         except Exception:
             traceback.print_exc()
         finally:
@@ -86,14 +77,13 @@ def player_stats_consumer(stat_queue, db_object_func):
     print('Consumer: Done')
 
 
-def update_players_stats_to_db(db_obj_func: Callable, matches: list[dict] = None, num_threads=5):
-    db_handler = db_obj_func()
+def update_players_stats_to_db(matches: list[dict] = None, num_threads=5):
     if matches is None or len(matches) == 0:
-        matches = get_db_matches(db_handler, end_date=datetime.now())
+        matches = get_db_matches(end_date=datetime.now())
 
     matches_queue = Queue()
     player_stats_producer(matches_queue, matches)
-    consumers = [Thread(target=player_stats_consumer, args=(matches_queue, db_obj_func,)) for i in range(num_threads)]
+    consumers = [Thread(target=player_stats_consumer, args=(matches_queue,)) for i in range(num_threads)]
     # TODO implement logging
     try:
         for consumer in consumers:

@@ -7,15 +7,15 @@ postgres_db_config = {
 
 mysql_db_config = {
     "user": "root",
-    "password": "@6Lo5weLL",
+    "password": "6Lo5weLL",
     "database": "eihlstats",
     "host": "localhost",
     "port": "3306"}
 
-eihl_base_url = "https://www.eliteleague.co.uk/"
-eihl_team_url = f"{eihl_base_url}team/"
-eihl_schedule_url = f"{eihl_base_url}schedule/"
-eihl_match_url = f"{eihl_base_url}game/"
+# eihl_base_url = "https://www.eliteleague.co.uk/"
+# eihl_team_url = f"{eihl_base_url}team/"
+# eihl_schedule_url = f"{eihl_base_url}schedule/"
+# eihl_match_url = f"{eihl_base_url}game/"
 
 match_team_stats_cols = {
     "Shots": "shots",

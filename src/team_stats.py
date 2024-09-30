@@ -6,16 +6,16 @@ from threading import Thread
 from pypika import Parameter, Field
 
 # TODO Create Protocol for DB handler
-from src.data_handlers.eihl_mysql import EIHLMysqlHandler
+from src.data_handlers.eihl_mysql import get_dup_records, insert_data, update_data
 from src.match import get_db_matches
-from src.web_scraping.eihl_website_scraping import extract_team_match_stats, get_eihl_match_url
+from src.web_scraping.website import Website
 
 
-def team_stats_producer(stat_queue, matches):
+def team_stats_producer(stat_queue, matches, website: Website):
     try:
         print("Producer: Running")
         for match_info in matches:
-            match_stats_url = get_eihl_match_url(match_info.get('eihl_web_match_id', ''))
+            match_stats_url = website.extract_match_info(match_info.get('eihl_web_match_id', ''))
             stat_queue.put((match_info, match_stats_url))
         print("Producer: Done")
         # team_stats.apply(insert_team_match_stats, args=(db_cur, db_conn, True), axis=1)
@@ -23,7 +23,7 @@ def team_stats_producer(stat_queue, matches):
         traceback.print_exc()
 
 
-def team_stats_consumer(stat_queue, db_object_func):
+def team_stats_consumer(stat_queue, db_object_func, website: Website):
     print("Consumer: Running")
     db_handler = db_object_func()
     while True:
@@ -31,7 +31,7 @@ def team_stats_consumer(stat_queue, db_object_func):
         if match_info is None:
             break
         try:
-            match_stats = extract_team_match_stats(match_url)
+            match_stats = website.extract_team_stats(match_url)
             for k, team_stats in match_stats.items():
                 # TODO data source handler should handle column name conversions
                 team_stats["team_name"] = match_info.get(k, None)
@@ -45,38 +45,37 @@ def team_stats_consumer(stat_queue, db_object_func):
     print('Consumer: Done')
 
 
-def insert_team_match_stats_to_db(db_handler: EIHLMysqlHandler, team_match_stats: dict):
+def insert_team_match_stats_to_db(team_match_stats: dict):
     team_name = team_match_stats.get("team_name", None)
     match_id = team_match_stats.get("match_id", None)
-    dup_records = db_handler.get_dup_records(params=team_match_stats, table="match_team_stats",
-                                             where_clause=((Field("match_id") == Parameter("%(match_id)s")) &
-                                                           (Field("team_name") == Parameter("%(team_name)s"))
-                                                           )
-                                             )
+    dup_records = get_dup_records(params=team_match_stats, table="match_team_stats",
+                                  where_clause=((Field("match_id") == Parameter("%(match_id)s")) &
+                                                (Field("team_name") == Parameter("%(team_name)s"))
+                                                )
+                                  )
 
     if len(dup_records) == 0:
         try:
-            db_handler.insert_data("match_team_stats", team_match_stats)
+            insert_data("match_team_stats", team_match_stats)
         except TypeError:
             traceback.print_exc()
         else:
             print(f"Match ID: {match_id} team: {team_name} stats inserted!")
     else:
-        db_handler.update_data("match_team_stats", team_match_stats,
-                               where_clause=((Field("match_id") == Parameter("%(match_id)s")) &
-                                             (Field("team_name") == Parameter("%(team_name)s"))
-                                             )
-                               )
+        update_data("match_team_stats", team_match_stats,
+                    where_clause=((Field("match_id") == Parameter("%(match_id)s")) &
+                                  (Field("team_name") == Parameter("%(team_name)s"))
+                                  )
+                    )
 
 
-def update_match_team_stats(db_obj_func: callable, num_threads=5, matches: list[dict] = None):
-    db_handler = db_obj_func()
+def update_match_team_stats(num_threads=5, matches: list[dict] = None):
     if len(matches) == 0:
-        matches = get_db_matches(db_handler, end_date=datetime.now())
+        matches = get_db_matches(end_date=datetime.now())
 
     matches_queue = Queue()
     team_stats_producer(matches_queue, matches)
-    consumers = [Thread(target=team_stats_consumer, args=(matches_queue, db_obj_func,)) for i in range(num_threads)]
+    consumers = [Thread(target=team_stats_consumer, args=(matches_queue,)) for i in range(num_threads)]
     # TODO implement logging
     try:
         for consumer in consumers:

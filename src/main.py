@@ -1,3 +1,4 @@
+import traceback
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -5,19 +6,17 @@ from typing import Callable, Tuple
 
 from pypika import Query, Field, Table
 
-from settings.settings import eihl_match_url
-from src.data_handlers.eihl_mysql import EIHLMysqlHandler
+from src.data_handlers.eihl_mysql import fetch_all_db_data, get_dup_records, insert_data
+# from settings.settings import eihl_match_url
 # from src.data_handlers.eihl_postgres import EIHLPostgresHandler
-from src.match import update_eihl_scores_from_game_centre, refresh_championships, get_db_season_ids, \
-    update_match_scores, get_db_matches
+from src.match import update_db_match_score, get_db_matches, update_matches, insert_matches
 from src.player_stats import update_players_stats_to_db
 from src.team_stats import update_match_team_stats
-from src.web_scraping.eihl_website_scraping import get_gamecentre_team_id, get_eihl_championship_options, \
-    get_gamecentre_month_id
+from src.web_scraping.eihl_website_scraping import EIHLWebsite
 
 # TODO make builder function to get data source handler
 # ds_handler = EIHLPostgresHandler()
-db_handler_func = EIHLMysqlHandler
+website = EIHLWebsite()
 
 
 @dataclass(init=True)
@@ -53,45 +52,64 @@ def get_data_range() -> tuple[datetime, datetime]:
     return start_date, end_date
 
 
-def get_ids(team_names: list = None, months: list = None, seasons: list = None, db_handler=None):
-    if db_handler is None:
-        db_handler = db_handler_func()
-    gc_team_id = get_gamecentre_team_id()
-    gc_month_id = get_gamecentre_month_id()
-    season_ids = get_db_season_ids(db_handler)
-    if season_ids is None or len(season_ids) == 0:
-        print("There are no championship IDs stored in the DB")
-        season_ids = get_eihl_championship_options()
-    return gc_team_id, gc_month_id, season_ids
-
-
 def refresh_db():
-    db_handler = db_handler_func()
-    refresh_championships(db_handler)
-    update_eihl_scores_from_game_centre(db_handler, True)
-    update_match_team_stats(db_handler_func)
-    update_players_stats_to_db(db_handler_func)
+    refresh_championships()
+    insert_new_matches()
+    update_matches(website)
+    update_match_team_stats()
+    update_players_stats_to_db()
+
+
+def refresh_championships():
+    db_champs = fetch_all_db_data(table='championship', columns=[Field("eihl_web_id"), Field("name")])
+    eihl_web_champs = website.get_championships()
+    if eihl_web_champs == db_champs:
+        print(f"All championship options are stored in the database")
+    else:
+        champ_diff = [x for x in eihl_web_champs if x not in db_champs]
+        # for champ in champ_diff:
+        #     champ_schedule_url = get_gamecentre_url(season_id=champ.get("eihl_web_id", None))
+        #     start_dt, end_dt = get_start_end_dates_from_gamecentre(champ_schedule_url)
+        #     champ["start_date"] = start_dt
+        #     champ["end_date"] = end_dt
+        for champ in champ_diff:
+            try:
+                if len(get_dup_records(params=champ, table="championship")) == 0:
+                    insert_data("championship", champ)
+            except Exception:
+                traceback.print_exc()
+            else:
+                print("Championship has been inserted!")
+
+
+def insert_new_matches(start_date: datetime = datetime.min, end_date: datetime = datetime.max,
+                       teams: list | tuple | None = None):
+    if teams is None:
+        insert_matches(website, start_date, end_date)
+    else:
+        insert_matches(website, start_date, end_date, teams)
 
 
 def update_recent_data():
-    db_handler = db_handler_func()
-    refresh_championships(db_handler)
+    refresh_championships()
     match_query = Query.from_("match").select("*")
 
-    matches = db_handler.fetch_all_data(
+    matches = fetch_all_db_data(
         str(match_query.where((Field("home_score").isnull()) | (Field("away_score").isnull()))))
-    if len(matches) > 0:
-        update_match_scores(db_handler,
-                            [f"{eihl_match_url}{match.get('eihl_web_match_id', None)}" for match in matches])
-        match_table = Table("match")
-        update_team_stats(db_handler, match_table, match_query)
-
-        update_empty_player_stats(db_handler, match_query, match_table)
-    else:
+    if len(matches) == 0:
         print("There are no matches to update!")
+        return
+    for match in matches:
+        match_info = website.get_match_info(match)
+        update_db_match_score(match_info)
+
+    match_table = Table("match")
+    update_team_stats(match_table, match_query)
+
+    update_empty_player_stats(match_query, match_table)
 
 
-def update_empty_player_stats(db_handler, match_query, match_table):
+def update_empty_player_stats(match_query, match_table):
     player_stats_table = Table("match_player_stats")
     player_sub_query = Query() \
         .from_(match_table) \
@@ -105,24 +123,22 @@ def update_empty_player_stats(db_handler, match_query, match_table):
         (player_stats_table.saves == 0) | (match_table.home_score.isnull()) |
         (match_table.away_score.isnull()))
     miss_player_stat_query = str(match_query.where(Field("match_id").isin(player_sub_query)))
-    missing_player_stat_games = db_handler.fetch_all_data(miss_player_stat_query)
+    missing_player_stat_games = fetch_all_db_data(miss_player_stat_query)
     # missing_player_stat_games = db_handler.fetch_all_data( """SELECT * FROM `match` WHERE match_id IN (SELECT
     # m.match_id FROM `match` m LEFT JOIN match_player_stats mps ON mps.match_id = m.match_id GROUP BY
     # m.match_id, mps.goals, mps.shutouts, m.home_score, m.away_score HAVING (mps.goals=0 AND mps.shutouts=0) OR
     # m.home_score IS NULL or m.away_score IS NULL)""")
-    update_players_stats_to_db(db_handler_func, matches=missing_player_stat_games)
+    update_players_stats_to_db(matches=missing_player_stat_games)
 
 
 def update_player_stats():
-    db_handler = db_handler_func()
-
     start_date = enter_date()
     end_date = enter_date()
-    matches = get_db_matches(db_handler, start_date=start_date, end_date=end_date)
-    update_players_stats_to_db(db_handler_func, matches)
+    matches = get_db_matches(start_date=start_date, end_date=end_date)
+    update_players_stats_to_db(matches)
 
 
-def update_team_stats(db_handler, match_table, match_query):
+def update_team_stats(match_table, match_query):
     team_stats_table = Table("match_team_stats")
 
     team_sub_query = Query() \
@@ -134,32 +150,32 @@ def update_team_stats(db_handler, match_table, match_query):
                  match_table.home_score, match_table.away_score) \
         .having((team_stats_table.shots == 0) | (team_stats_table.saves == 0) | (match_table.home_score.isnull()) |
                 (match_table.away_score.isnull()))
-    missing_team_stat_games = db_handler.fetch_all_data(
+    missing_team_stat_games = fetch_all_db_data(
         str(match_query.where(Field("match_id").isin(team_sub_query))))
     # missing_team_stat_games = db_handler.fetch_all_data( """SELECT * FROM `match` WHERE match_id IN (SELECT
     # m.match_id FROM `match` m LEFT JOIN match_team_stats mts ON m.match_id = mts.match_id GROUP BY m.match_id,
     # mts.shots, mts.saves, m.home_score, m.away_score HAVING mts.shots=0 or mts.saves=0 OR m.home_score IS NULL
     # or m.away_score IS NULL)""")
-    update_match_team_stats(db_handler_func, matches=missing_team_stat_games)
+    update_match_team_stats(matches=missing_team_stat_games)
 
 
 class Options(Enum):
     # TODO Create main function to limit number of matches to find
     UPDATE_PLAYER_MATCH_STATS = CMDOption("Update player's stats for a particular match",
-                                          update_players_stats_to_db, (db_handler_func,))
+                                          update_players_stats_to_db)
     UPDATE_DB_MATCH = CMDOption("Update score for a particular match in the database",
                                 lambda x: "This will be implemented in the future")
     UPDATE_TEAM_MATCH_STATS = CMDOption("Update team's stats for a particular match", update_match_team_stats,
-                                        (db_handler_func,))
+                                        )
     UPDATE_CHAMPIONSHIPS = CMDOption("Update EIHL championships in the DB", refresh_championships,
-                                     (db_handler_func(),))
-    UPDATE_MATCH_SCORES = CMDOption("Update DB with the latest EIHL matches", update_eihl_scores_from_game_centre,
-                                    (db_handler_func(), True))
+                                     )
+    UPDATE_MATCH_SCORES = CMDOption("Update DB with the latest EIHL matches", insert_new_matches,
+                                    )
     REFRESH_DB = CMDOption("Update recent matches and stats", refresh_db)
     UPDATE_RECENT = CMDOption("Update recent matches and stats", update_recent_data)
     CHANGE_WEBSITE = CMDOption("Change Data Source", lambda x: "This will be implemented in the future")
     CHANGE_DATABASE = CMDOption("Change Database", lambda x: "This will be implemented in the future")
-    HELP = CMDOption("You know what this function works you eejit!", display_help)
+    HELP = CMDOption("You know what how this function works you eejit!", display_help)
     EXIT = CMDOption("Exit the program", exit)
 
 
@@ -169,7 +185,8 @@ def main():
 
     is_exit = False
     while not is_exit:
-        user_input = input("What would you like to do? ->")
+        # user_input = input("What would you like to do? ->")
+        user_input = "UPDATE_MATCH_SCORES"
         if user_input is None:
             continue
         try:
@@ -179,6 +196,7 @@ def main():
                 Options[user_input].value.action()
         except KeyError:
             print("This is an invalid option!")
+        break
 
 
 if __name__ == "__main__":
