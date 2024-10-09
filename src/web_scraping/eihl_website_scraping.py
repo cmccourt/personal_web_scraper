@@ -2,6 +2,7 @@ import re
 import traceback
 from collections import defaultdict
 from datetime import datetime
+from io import StringIO
 
 import bs4
 import pandas as pd
@@ -190,7 +191,9 @@ class EIHLWebsite:
             teams = []
         if url is None:
             url = self.eihl_schedule_url
+
         res_beaus = get_html_content(url)
+
         html_content = res_beaus.find("body").find("main").find(class_="wrapper")
         html_content = html_content.find(class_="container-fluid text-center text-md-left")
 
@@ -209,11 +212,16 @@ class EIHLWebsite:
                 elif match_date > end_date:
                     break
             if tag.name == "div" and len(tag.find_all()) > 0:
-                # TODO add championship id to match_info
                 # TODO should the data storage class handle column name conversions?
                 match_info = self.extract_team_score_from_tag(tag)
                 match_info["championship_id"] = self.get_season_id(url)
                 match_info["match_date"] = match_date
+                try:
+                    match_a_tag = tag.find("a")
+                    match_url = f"{self.eihl_base_url}{match_a_tag['href']}"
+                except Exception:
+                    match_url = None
+                match_info["match_url"] = match_url
                 try:
                     match_info["match_date"] = datetime.combine(match_date, match_info.pop("match_time"))
                 except (AttributeError, TypeError, KeyError):
@@ -300,7 +308,8 @@ class EIHLWebsite:
             # if isinstance(table_tag, bs4.Tag):
             try:
                 try:
-                    player_stat_dtf = pd.read_html(str(table_tag))[0]
+                    # TODO pass appropriate string to read_html
+                    player_stat_dtf = pd.read_html(StringIO(str(table_tag)))[0]
                 except ValueError:
                     print(f"ERROR No tables found for: {table_tag}")
 
@@ -384,8 +393,12 @@ class EIHLWebsite:
             print(f"Cannot find season ID in url: {url}")
         return None
 
-    def get_match_stats_url(self, match_id):
+    def get_match_stats_url_from_game_id(self, match_id):
         match_stats_url = f"{self.eihl_match_url}{match_id}/stats"
+        return match_stats_url
+
+    def get_match_stats_url_from_main_game_page(self, url):
+        match_stats_url = f"{url}/stats"
         return match_stats_url
 
     def get_gamecentre_url(self, season_id: int = None, team_id: int = None, month_id: int = None,

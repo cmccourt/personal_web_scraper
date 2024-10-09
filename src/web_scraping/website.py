@@ -23,8 +23,11 @@ class Website(Protocol):
     def get_championships(self):
         pass
 
-    def get_match_stats_url(self):
+    def get_match_stats_url(self, match_id):
         pass
 
     def get_gamecentre_url(self):
+        pass
+
+    def get_match_stats_url_from_main_game_page(self, url):
         pass

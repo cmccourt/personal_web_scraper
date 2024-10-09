@@ -2,7 +2,7 @@ import traceback
 from datetime import datetime
 from typing import Any, Sequence
 
-from mysql.connector import connect, connection, IntegrityError
+from mysql.connector import connect, connection, IntegrityError, DatabaseError
 from pypika import MySQLQuery, Field, Criterion
 from sqlalchemy import create_engine
 
@@ -55,6 +55,7 @@ match_player_stats_cols = {
     "GA": "goals_against",
     "MIN": "mins_played",
     "SVS%": "save_percentage",
+    "BS": "blocked_shots",
     "TOI": "toi"
 }
 match_team_stats_cols = {
@@ -116,6 +117,8 @@ def insert_data(table_name: str, new_val_dict: dict):
         # print(db_cur.mogrify(query, player_match_stats))
         execute_query(query)
     except IntegrityError:
+        raise
+    except DatabaseError:
         raise
 
 

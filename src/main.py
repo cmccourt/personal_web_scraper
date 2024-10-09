@@ -90,6 +90,7 @@ def insert_new_matches(start_date: datetime = datetime.min, end_date: datetime =
         insert_matches(website, start_date, end_date, teams)
 
 
+
 def update_recent_data():
     refresh_championships()
     match_query = Query.from_("match").select("*")
@@ -131,11 +132,13 @@ def update_empty_player_stats(match_query, match_table):
     update_players_stats_to_db(matches=missing_player_stat_games)
 
 
-def update_player_stats():
-    start_date = enter_date()
-    end_date = enter_date()
+def update_player_stats(start_date=None, end_date=None):
+    if start_date is None:
+        start_date = enter_date()
+    if end_date is None:
+        end_date = enter_date()
     matches = get_db_matches(start_date=start_date, end_date=end_date)
-    update_players_stats_to_db(matches)
+    update_players_stats_to_db(website, matches)
 
 
 def update_team_stats(match_table, match_query):
@@ -162,7 +165,7 @@ def update_team_stats(match_table, match_query):
 class Options(Enum):
     # TODO Create main function to limit number of matches to find
     UPDATE_PLAYER_MATCH_STATS = CMDOption("Update player's stats for a particular match",
-                                          update_players_stats_to_db)
+                                          update_player_stats, (datetime.min, datetime.max))
     UPDATE_DB_MATCH = CMDOption("Update score for a particular match in the database",
                                 lambda x: "This will be implemented in the future")
     UPDATE_TEAM_MATCH_STATS = CMDOption("Update team's stats for a particular match", update_match_team_stats,
@@ -186,7 +189,7 @@ def main():
     is_exit = False
     while not is_exit:
         # user_input = input("What would you like to do? ->")
-        user_input = "UPDATE_MATCH_SCORES"
+        user_input = "UPDATE_PLAYER_MATCH_STATS"
         if user_input is None:
             continue
         try:
