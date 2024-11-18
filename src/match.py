@@ -23,7 +23,6 @@ def get_db_matches(teams: list[str] = None,
 
 
 def update_db_match_score(match_info):
-    # TODO Create TRIGGER in Database to handle duplicates
     dup_clause = ((Field("match_date") == Parameter("%(match_date)s")) &
                   (Field("home_team") == Parameter("%(home_team)s")) &
                   (Field("away_team") == Parameter("%(away_team)s")))
@@ -73,11 +72,6 @@ def update_matches(website, start_date: datetime = None, end_date: datetime = No
             dup_records = get_dup_records(params=match, table="match", where_clause=dup_clause)
             if len(dup_records) == 1:
                 update_data("match", match, where_clause=dup_clause)
-            elif len(dup_records) == 0:
-                try:
-                    insert_data("match", match)
-                except Exception:
-                    traceback.print_exc()
             else:
                 # TODO Implement logging for this scenario
                 print(f"More than 1 duplicate for match: {match}")

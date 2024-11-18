@@ -3,9 +3,11 @@ import traceback
 from collections import defaultdict
 from datetime import datetime
 from io import StringIO
+from typing import Any
 
 import bs4
 import pandas as pd
+from pandas import DataFrame
 
 # from src.data_handlers.eihl_mysql import EIHLMysqlHandler
 # from settings.settings import eihl_schedule_url, eihl_match_url
@@ -280,7 +282,7 @@ class EIHLWebsite(Website):
                 match_info["match_win_type"] = None
         return match_info
 
-    def extract_player_stats(self, url: str) -> defaultdict[pd.DataFrame]:
+    def extract_player_stats(self, url: str) -> defaultdict[Any, DataFrame]:
         res_beaus = get_html_content(url)
         html_container = res_beaus.find('div', attrs={'class': 'container'})
         game_stats = defaultdict(pd.DataFrame)
@@ -306,12 +308,11 @@ class EIHLWebsite(Website):
                     if table_tag is not None:
                         table_tag = tag
                         break
-            # if isinstance(table_tag, bs4.Tag):
             try:
                 try:
                     player_stat_dtf = pd.read_html(StringIO(str(table_tag)))[0]
                 except ValueError:
-                    print(f"ERROR No tables found for: {table_tag}")
+                    print(f"ERROR Stats are not available for match: {url}")
 
                 game_stats[team_name] = pd.concat([game_stats[team_name], player_stat_dtf], ignore_index=False)
                 try:
