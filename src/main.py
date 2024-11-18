@@ -10,13 +10,14 @@ from src.data_handlers.eihl_mysql import fetch_all_db_data, get_dup_records, ins
 # from settings.settings import eihl_match_url
 # from src.data_handlers.eihl_postgres import EIHLPostgresHandler
 from src.match import update_db_match_score, get_db_matches, update_matches, insert_matches
-from src.player_stats import update_players_stats_to_db
+from src.player_stats import insert_players_stats_to_db
 from src.team_stats import update_match_team_stats
 from src.web_scraping.eihl_website_scraping import EIHLWebsite
+from src.web_scraping.website import Website
 
 # TODO make builder function to get data source handler
 # ds_handler = EIHLPostgresHandler()
-website = EIHLWebsite()
+website: Website = EIHLWebsite()
 
 
 @dataclass(init=True)
@@ -57,7 +58,7 @@ def refresh_db():
     insert_new_matches()
     update_matches(website)
     update_match_team_stats()
-    update_players_stats_to_db()
+    insert_players_stats_to_db()
 
 
 def refresh_championships():
@@ -105,7 +106,7 @@ def update_recent_data():
         update_db_match_score(match_info)
 
     match_table = Table("match")
-    update_team_stats(match_table, match_query)
+    update_empty_team_stats(match_table, match_query)
 
     update_empty_player_stats(match_query, match_table)
 
@@ -129,19 +130,28 @@ def update_empty_player_stats(match_query, match_table):
     # m.match_id FROM `match` m LEFT JOIN match_player_stats mps ON mps.match_id = m.match_id GROUP BY
     # m.match_id, mps.goals, mps.shutouts, m.home_score, m.away_score HAVING (mps.goals=0 AND mps.shutouts=0) OR
     # m.home_score IS NULL or m.away_score IS NULL)""")
-    update_players_stats_to_db(matches=missing_player_stat_games)
+    insert_players_stats_to_db(website, matches=missing_player_stat_games)
 
 
-def update_player_stats(start_date=None, end_date=None):
+def insert_player_stats(start_date=None, end_date=None):
     if start_date is None:
         start_date = enter_date()
     if end_date is None:
         end_date = enter_date()
     matches = get_db_matches(start_date=start_date, end_date=end_date)
-    update_players_stats_to_db(website, matches)
+    insert_players_stats_to_db(website, matches)
 
 
-def update_team_stats(match_table, match_query):
+def insert_team_match_stats(start_date=None, end_date=None):
+    if start_date is None:
+        start_date = enter_date()
+    if end_date is None:
+        end_date = enter_date()
+    matches = get_db_matches(start_date=start_date, end_date=end_date)
+    update_match_team_stats(website, matches=matches)
+
+
+def update_empty_team_stats(match_table, match_query):
     team_stats_table = Table("match_team_stats")
 
     team_sub_query = Query() \
@@ -159,16 +169,17 @@ def update_team_stats(match_table, match_query):
     # m.match_id FROM `match` m LEFT JOIN match_team_stats mts ON m.match_id = mts.match_id GROUP BY m.match_id,
     # mts.shots, mts.saves, m.home_score, m.away_score HAVING mts.shots=0 or mts.saves=0 OR m.home_score IS NULL
     # or m.away_score IS NULL)""")
-    update_match_team_stats(matches=missing_team_stat_games)
+    update_match_team_stats(website, matches=missing_team_stat_games)
 
 
 class Options(Enum):
     # TODO Create main function to limit number of matches to find
     UPDATE_PLAYER_MATCH_STATS = CMDOption("Update player's stats for a particular match",
-                                          update_player_stats, (datetime.min, datetime.max))
+                                          insert_player_stats, (datetime.min, datetime.max))
     UPDATE_DB_MATCH = CMDOption("Update score for a particular match in the database",
                                 lambda x: "This will be implemented in the future")
-    UPDATE_TEAM_MATCH_STATS = CMDOption("Update team's stats for a particular match", update_match_team_stats,
+    UPDATE_TEAM_MATCH_STATS = CMDOption("Update team's stats for a particular match", insert_team_match_stats,
+                                        (datetime.min, datetime.max)
                                         )
     UPDATE_CHAMPIONSHIPS = CMDOption("Update EIHL championships in the DB", refresh_championships,
                                      )
@@ -176,8 +187,6 @@ class Options(Enum):
                                     )
     REFRESH_DB = CMDOption("Update recent matches and stats", refresh_db)
     UPDATE_RECENT = CMDOption("Update recent matches and stats", update_recent_data)
-    CHANGE_WEBSITE = CMDOption("Change Data Source", lambda x: "This will be implemented in the future")
-    CHANGE_DATABASE = CMDOption("Change Database", lambda x: "This will be implemented in the future")
     HELP = CMDOption("You know what how this function works you eejit!", display_help)
     EXIT = CMDOption("Exit the program", exit)
 
@@ -189,7 +198,7 @@ def main():
     is_exit = False
     while not is_exit:
         # user_input = input("What would you like to do? ->")
-        user_input = "UPDATE_PLAYER_MATCH_STATS"
+        user_input = "UPDATE_TEAM_MATCH_STATS"
         if user_input is None:
             continue
         try:

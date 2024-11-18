@@ -31,3 +31,9 @@ class Website(Protocol):
 
     def get_match_stats_url_from_main_game_page(self, url):
         pass
+
+    def extract_match_stats(self, match_url):
+        pass
+
+    def get_team_stats_url_from_main_game_page(self, match_url):
+        pass

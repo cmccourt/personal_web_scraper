@@ -10,9 +10,10 @@ import pandas as pd
 # from src.data_handlers.eihl_mysql import EIHLMysqlHandler
 # from settings.settings import eihl_schedule_url, eihl_match_url
 from src.utils import extract_date_from_str, extract_float_from_str, get_html_content, get_date_range_from_str_list
+from src.web_scraping.website import Website
 
 
-class EIHLWebsite:
+class EIHLWebsite(Website):
     eihl_base_url = "https://www.eliteleague.co.uk/"
     eihl_team_url = f"{eihl_base_url}team/"
     eihl_schedule_url = f"{eihl_base_url}schedule"
@@ -225,7 +226,7 @@ class EIHLWebsite:
                 try:
                     match_info["match_date"] = datetime.combine(match_date, match_info.pop("match_time"))
                 except (AttributeError, TypeError, KeyError):
-                    # no time present. Created dummy placeholder
+                    # No time present. Create time placeholder
                     match_info["match_date"] = match_date
                 matches.append(match_info)
         return matches
@@ -243,11 +244,11 @@ class EIHLWebsite:
         try:
             match_info["match_time"] = extract_date_from_str(match_details[0], "%H:%M").time()
         except AttributeError:
-            # no time present. Created dummy placeholder
+            # No time present. Create time placeholder
             match_info["match_time"] = None
             match_details.insert(0, None)
 
-        # EIHL website for older seasons have game numbers or match type between time and home team
+        # Older seasons on the EIHL website have game numbers or match type between time and home team
         if str.isdigit(match_details[1]) or len(match_details) > 2:
             del match_details[1]
         match_details[1] = match_details[1].replace("\n", "").strip()
@@ -308,7 +309,6 @@ class EIHLWebsite:
             # if isinstance(table_tag, bs4.Tag):
             try:
                 try:
-                    # TODO pass appropriate string to read_html
                     player_stat_dtf = pd.read_html(StringIO(str(table_tag)))[0]
                 except ValueError:
                     print(f"ERROR No tables found for: {table_tag}")
@@ -398,8 +398,10 @@ class EIHLWebsite:
         return match_stats_url
 
     def get_match_stats_url_from_main_game_page(self, url):
-        match_stats_url = f"{url}/stats"
-        return match_stats_url
+        return f"{url}/stats"
+
+    def get_team_stats_url_from_main_game_page(self, url):
+        return f"{url}/team-stats"
 
     def get_gamecentre_url(self, season_id: int = None, team_id: int = None, month_id: int = None,
                            schedule_url: str = None) -> str:

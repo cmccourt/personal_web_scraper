@@ -87,8 +87,7 @@ def player_stats_consumer(stat_queue, website: Website):
     print('Consumer: Done')
 
 
-def update_players_stats_to_db(website, matches: list[dict], num_threads=5):
-
+def insert_players_stats_to_db(website, matches: list[dict], num_threads=5):
     matches_queue = Queue()
     for match in matches:
         matches_queue.put(match)
